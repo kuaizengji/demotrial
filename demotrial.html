@@ -1129,6 +1129,41 @@
             font-size: 12px;
             color: #706757;
         }
+        .flashcard-title-text,
+        #flashcard-side-title {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .flashcard-title-text {
+            font-size: clamp(1.05rem, 3.2vw, 1.45rem);
+            line-height: 1.4;
+            font-weight: 600;
+            color: #4d5d70;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        #flashcard-subtitle,
+        #flashcard-side-title {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        #flashcard-front-hint,
+        #flashcard-back-answer,
+        #flashcard-side-summary {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        #flashcard-front-hint,
+        #flashcard-back-answer {
+            display: -webkit-box;
+            -webkit-line-clamp: 5;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
         body.night-mode .flashcard-sheet {
             background: linear-gradient(180deg, rgba(24, 31, 46, 0.98) 0%, rgba(17, 24, 39, 0.98) 100%);
             border-color: rgba(76, 93, 122, 0.5) !important;
@@ -1188,20 +1223,24 @@
             color: #c1cee4 !important;
         }
         @media (max-width: 767px) {
-            .flashcard-stack {
-                min-height: 360px;
-            }
-            .flashcard-motion-layer {
-                min-height: 360px;
-            }
+            .flashcard-stack,
+            .flashcard-motion-layer,
             .flashcard-card {
-                min-height: 360px;
+                min-height: 260px;
             }
             .flashcard-face {
-                padding: 22px 18px;
+                padding: 18px 16px;
             }
             .flashcard-shadow-card {
                 inset: 24px 12px 14px;
+            }
+            .flashcard-title-text {
+                font-size: 1.05rem;
+                -webkit-line-clamp: 3;
+            }
+            #flashcard-front-hint,
+            #flashcard-back-answer {
+                -webkit-line-clamp: 3;
             }
         }
 
@@ -1622,6 +1661,9 @@
             background: linear-gradient(180deg, rgba(244, 248, 252, 0.96) 0%, rgba(236, 242, 249, 0.92) 100%);
             padding: 0.8rem 0.85rem;
         }
+        .chat-ai-reply-body > .chat-knowledge-section {
+            margin-top: 0.9rem;
+        }
         .chat-knowledge-head {
             display: flex;
             align-items: center;
@@ -1645,6 +1687,7 @@
         .chat-knowledge-text {
             flex: 1;
             min-width: 0;
+            overflow-wrap: anywhere;
             font-size: 0.86em;
             line-height: 1.62;
             color: #536579;
@@ -1860,12 +1903,34 @@
         .chat-thinking-panel.is-collapsed .chat-thinking-chevron {
             transform: rotate(-90deg);
         }
+        .chat-thinking-panel.is-finished {
+            position: relative;
+            top: auto;
+            z-index: auto;
+            background: transparent;
+            padding: 0.15rem 0 0.4rem;
+        }
         .chat-thinking-body {
             margin-top: 0.72rem;
             padding-top: 0.72rem;
             border-top: 1px solid rgba(203, 213, 225, 0.7);
             max-height: 18rem;
             overflow: auto;
+        }
+        .chat-thinking-preview {
+            display: none;
+            margin-top: 0.55rem;
+            color: #7a8796;
+            font-size: 0.86em;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            border-left: 2px solid rgba(148, 163, 184, 0.32);
+            padding-left: 0.85rem;
+            max-height: 4.8em;
+            overflow: hidden;
+        }
+        .chat-thinking-panel.is-finished.is-collapsed .chat-thinking-preview:not(:empty) {
+            display: block;
         }
         .chat-thinking-panel.is-collapsed .chat-thinking-body {
             display: none;
@@ -1952,6 +2017,146 @@
             color: #8a97a8;
             font-size: 0.65rem;
             margin-right: 0.28rem;
+        }
+        #history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+        }
+        .history-pin-group {
+            padding-bottom: 0.15rem;
+        }
+        .history-pin-group:not(.is-collapsed) {
+            border-bottom: 1px solid rgba(125, 146, 178, 0.14);
+            padding-bottom: 0.5rem;
+        }
+        .history-pin-toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            border: 0;
+            background: transparent;
+            padding: 0.55rem 0.45rem;
+            color: #6b7a8d;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            cursor: pointer;
+            border-radius: 12px;
+        }
+        .history-pin-toggle:hover {
+            background: rgba(125, 146, 178, 0.08);
+        }
+        .history-pin-toggle-left {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.42rem;
+            min-width: 0;
+        }
+        .history-pin-toggle-label {
+            white-space: nowrap;
+        }
+        .history-pin-chevron {
+            font-size: 0.62rem;
+            color: #9aa6b5;
+        }
+        .history-pin-group.is-collapsed .history-pin-toggle {
+            padding: 0.85rem 0.55rem;
+            color: #4d5f74;
+            font-size: 14px;
+        }
+        .history-pin-items {
+            display: flex;
+            flex-direction: column;
+            gap: 0.12rem;
+            padding: 0.05rem 0 0.2rem;
+        }
+        .history-pin-group.is-collapsed .history-pin-items {
+            display: none;
+        }
+        .history-item.is-pinned {
+            border: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            border-radius: 12px;
+            padding: 0.72rem 0.7rem;
+        }
+        .history-item.is-pinned::before,
+        .history-item.is-pinned::after {
+            display: none !important;
+        }
+        .history-item.is-pinned:hover,
+        .history-item.is-pinned.is-menu-open {
+            transform: none;
+            background: rgba(125, 146, 178, 0.1) !important;
+            box-shadow: none !important;
+        }
+        .history-item.is-pinned.active {
+            transform: none;
+            background: rgba(125, 146, 178, 0.16) !important;
+            border-color: transparent !important;
+            box-shadow: none !important;
+        }
+        .history-recent-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .history-recent-label {
+            margin: 0;
+            padding: 0.15rem 0.45rem 0;
+            color: #8a97a8;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        body.night-mode .history-pin-toggle {
+            color: #9eb0c8;
+        }
+        body.night-mode .history-pin-toggle:hover {
+            background: rgba(94, 114, 148, 0.18);
+        }
+        body.night-mode .history-pin-group.is-collapsed .history-pin-toggle {
+            color: #dbe5f4;
+        }
+        body.night-mode .history-item.is-pinned {
+            background: transparent !important;
+            box-shadow: none !important;
+            border-color: transparent !important;
+        }
+        body.night-mode .history-item.is-pinned:hover,
+        body.night-mode .history-item.is-pinned.is-menu-open {
+            background: rgba(94, 114, 148, 0.22) !important;
+        }
+        body.night-mode .history-item.is-pinned.active {
+            background: rgba(111, 137, 176, 0.32) !important;
+            border-color: transparent !important;
+        }
+        body.night-mode .history-recent-label,
+        body.night-mode .history-pin-chevron {
+            color: #8b9bb0 !important;
+        }
+        body.night-mode .history-pin-group:not(.is-collapsed) {
+            border-bottom-color: rgba(94, 114, 148, 0.28);
+        }
+        body.warm-mode .history-pin-toggle {
+            color: #7a746c;
+        }
+        body.warm-mode .history-pin-group.is-collapsed .history-pin-toggle {
+            color: #534d48;
+        }
+        body.warm-mode .history-item.is-pinned {
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+        body.warm-mode .history-item.is-pinned:hover,
+        body.warm-mode .history-item.is-pinned.is-menu-open {
+            background: rgba(141, 154, 176, 0.14) !important;
+        }
+        body.warm-mode .history-item.is-pinned.active {
+            background: rgba(141, 154, 176, 0.22) !important;
+            border-color: transparent !important;
         }
         .history-menu {
             position: fixed;
@@ -2127,6 +2332,20 @@
                 min-width: 0;
                 width: 100%;
             }
+            #chat-window {
+                -webkit-overflow-scrolling: touch;
+            }
+            .chat-save-note-btn,
+            .chat-knowledge-save-btn {
+                min-height: 2rem;
+                font-size: 12px;
+                padding: 0.28rem 0.7rem;
+                white-space: nowrap;
+            }
+            .chat-knowledge-head {
+                flex-wrap: wrap;
+                align-items: flex-start;
+            }
         }
 
         @media (max-width: 767px) {
@@ -2148,6 +2367,16 @@
             }
             .chat-thinking-body {
                 max-height: 12.5rem;
+            }
+            .chat-thinking-panel.is-finished.is-collapsed .chat-thinking-preview {
+                display: none !important;
+            }
+            .chat-session-head {
+                padding: 0.55rem 0.85rem 0.05rem;
+            }
+            #chat-window {
+                padding: 0.45rem 0.75rem 0.9rem;
+                gap: 1.05rem;
             }
             #settings-panel {
                 width: min(18rem, 100vw);
@@ -2433,10 +2662,14 @@
             background: #3d5a82 !important;
             color: #ffffff !important;
         }
+        body.night-mode .chat-thinking-panel.is-finished {
+            background: transparent;
+        }
         body.night-mode .chat-thinking-body {
             border-top-color: #4a6488;
         }
-        body.night-mode .chat-thinking-stream {
+        body.night-mode .chat-thinking-stream,
+        body.night-mode .chat-thinking-preview {
             color: #e8eef8 !important;
             border-left-color: #6f89b0;
         }
@@ -3245,7 +3478,7 @@
         <div id="history-empty" class="hidden flex-1 items-center justify-center text-center text-sm text-gray-400 px-6">
             还没有历史对话，发几条消息后这里会自动保存。
         </div>
-        <div id="history-list" class="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1"></div>
+        <div id="history-list" class="flex-1 overflow-y-auto custom-scrollbar pr-1"></div>
     </div>
     <div id="history-menu" class="history-menu hidden" role="menu"></div>
     <div id="profile-overlay" class="fixed inset-0 bg-black bg-opacity-40 z-[75] hidden"></div>
@@ -3311,7 +3544,7 @@
                                     </div>
                                     <div>
                                         <p class="text-[12px] text-gray-400 mb-2">这道题最容易错在哪里？</p>
-                                        <h4 id="flashcard-front-question" class="text-[22px] sm:text-[28px] leading-[1.35] font-semibold text-[#4d5d70]">题面加载中...</h4>
+                                        <h4 id="flashcard-front-question" class="flashcard-title-text">题面加载中...</h4>
                                     </div>
                                     <div class="mt-auto pt-6">
                                         <p id="flashcard-front-hint" class="text-sm text-gray-500 leading-relaxed">点击卡片查看答案与拆解。</p>
@@ -3324,7 +3557,7 @@
                                     </div>
                                     <div>
                                         <p class="text-[12px] text-gray-400 mb-2">拆题思路</p>
-                                        <h4 id="flashcard-back-answer" class="text-[18px] sm:text-[22px] leading-[1.5] font-semibold text-[#4b5a6c]">答案内容加载中...</h4>
+                                        <h4 id="flashcard-back-answer" class="flashcard-title-text">答案内容加载中...</h4>
                                     </div>
                                     <ul id="flashcard-back-points" class="flashcard-point-list mt-5 space-y-2 text-sm text-gray-600"></ul>
                                 </div>
@@ -3517,6 +3750,7 @@
             const STORE_NAME = 'chat_sessions';
             const PROFILE_STORE_NAME = 'user_settings';
             const ACTIVE_CHAT_KEY = 'taoran-active-chat-id';
+            const PINNED_SECTION_KEY = 'taoran-history-pinned-open';
             const PROFILE_KEY = 'profile';
             const CALENDAR_SETTINGS_KEY = 'calendar_settings';
             const FLASHCARD_STATE_KEY = 'taoran-flashcard-state';
@@ -3820,7 +4054,7 @@
                             ? parsed.knowledge_cards.map(item => String(item || '').trim()).filter(Boolean)
                             : [],
                         knowledgeMethodology: Array.isArray(parsed.knowledge_methodology)
-                            ? parsed.knowledge_methodology.map(item => String(item || '').trim()).filter(isUsefulKnowledgeLine)
+                            ? parsed.knowledge_methodology.map(item => String(item || '').trim()).filter(Boolean)
                             : [],
                         followUp: String(parsed.follow_up || '').trim()
                     });
@@ -3862,7 +4096,7 @@
                     : [];
                 const methodologyBlockMatch = source.match(/"knowledge_methodology"\s*:\s*\[([\s\S]*?)\]\s*(?:,|$)/);
                 const knowledgeMethodology = methodologyBlockMatch
-                    ? Array.from(methodologyBlockMatch[1].matchAll(/"([\s\S]*?)"/g)).map(match => decodeJsonLikeString(match[1])).filter(isUsefulKnowledgeLine)
+                    ? Array.from(methodologyBlockMatch[1].matchAll(/"([\s\S]*?)"/g)).map(match => decodeJsonLikeString(match[1])).filter(Boolean)
                     : [];
 
                 return applyCorrectedQuestionType({
@@ -3970,7 +4204,7 @@
                             && !isJsonConstructionNoise(item)
                             && !/^\s*[{[]/.test(item)
                             && !/^"[a-z_]+"\s*:/.test(item)
-                            && !/(?:JSON|字段名|输出格式|schema)/i.test(item)
+                            && !/(?:JSON|字段名|输出格式|schema|知识卡片|输出要求)/i.test(item)
                         ));
                     if (kept.length) cleaned.push(kept.join(''));
                 });
@@ -4033,6 +4267,29 @@
                     if (detail) return detail;
                     return title;
                 }).filter(Boolean).join('\n\n'));
+            }
+
+            function thinkingPreviewText(text) {
+                const parts = String(text || '')
+                    .split(/\n+/)
+                    .map(item => item.trim())
+                    .filter(Boolean)
+                    .filter(item => !isJsonConstructionNoise(item))
+                    .filter(item => !/^首先[，,]用户的问题是/.test(item) && !/^我需要(?:检查|根据|回顾)/.test(item))
+                    .filter(item => !/(?:知识卡片|输出要求|3\s*-\s*5个关键词)/i.test(item))
+                    .filter(item => item.length >= 16 && !/^(?:在输出|现在输出|开始输出)/.test(item));
+                if (!parts.length) {
+                    const fallback = String(text || '').trim();
+                    return fallback.length > 90 ? `${fallback.slice(-90).trim()}` : fallback;
+                }
+                return parts.slice(-2).join('\n\n');
+            }
+
+            function scrollChatToElement(element, offset = 10) {
+                if (!chatWindow || !element) return;
+                const chatRect = chatWindow.getBoundingClientRect();
+                const elementRect = element.getBoundingClientRect();
+                chatWindow.scrollTop += elementRect.top - chatRect.top - offset;
             }
 
             function getStructuredReplyPreview(data) {
@@ -4222,23 +4479,91 @@
                 return /如果|若|当|时|则|就|用|填|选|使用|只能|必须|不要|禁止|不是|没有|改成|变成|独一无二|主动|被动|：|:|→|->/.test(raw);
             }
 
+            function splitKnowledgeCandidateLines(text) {
+                return String(text || '')
+                    .split(/\n+/)
+                    .flatMap(line => String(line || '').split(/\s*[；;]\s*/))
+                    .map(item => item
+                        .replace(/^[-*•、]\s+/, '')
+                        .replace(/^[①②③④⑤⑥⑦⑧⑨⑩]+[\.．、\)]?\s*/, '')
+                        .replace(/^\d+[\.．、\)]\s*/, '')
+                        .trim())
+                    .filter(Boolean);
+            }
+
+            function extractTeachingPointLines(text) {
+                const source = String(text || '');
+                if (!source.trim()) return [];
+                const marker = source.match(/【\s*教学要点\s*】|教学要点\s*[:：]|【\s*知识点与方法论\s*】|知识点与方法论\s*[:：]/);
+                if (!marker) return [];
+                const rest = source.slice(marker.index + marker[0].length);
+                const nextHeading = rest.search(/\n\s*【\s*[^】]{1,20}\s*】|\n\s*#{1,3}\s+/);
+                const block = (nextHeading >= 0 ? rest.slice(0, nextHeading) : rest).trim();
+                const unique = [];
+                splitKnowledgeCandidateLines(block).forEach(item => {
+                    if (item.length < 6 || item.length > 160) return;
+                    if (/^(后续|补充说明|答案|具体讲解)/.test(item)) return;
+                    if (unique.some(existing => existing === item || existing.includes(item) || item.includes(existing))) return;
+                    unique.push(item);
+                });
+                return unique.slice(0, 4);
+            }
+
+            function stripTeachingPointBlock(text) {
+                return String(text || '')
+                    .replace(/(?:【\s*教学要点\s*】|教学要点\s*[:：]|【\s*知识点与方法论\s*】|知识点与方法论\s*[:：])[\s\S]*?(?=\n\s*【\s*[^】]{1,20}\s*】|\n\s*#{1,3}\s+|$)/g, '\n')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+            }
+
+            function mergeKnowledgeLines(list) {
+                const unique = [];
+                (Array.isArray(list) ? list : []).forEach(item => {
+                    const text = String(item || '').trim();
+                    if (!text) return;
+                    if (unique.some(existing => existing === text || existing.includes(text) || text.includes(existing))) return;
+                    unique.push(text);
+                });
+                return unique;
+            }
+
             function getKnowledgeMethodologyLines(data) {
                 if (!data) return [];
-                const primary = Array.isArray(data.knowledgeMethodology) ? data.knowledgeMethodology : [];
-                const cleanedPrimary = [];
-                primary.forEach(item => {
-                    const text = String(item || '').trim();
-                    if (!isUsefulKnowledgeLine(text)) return;
-                    if (cleanedPrimary.some(existing => existing === text || existing.includes(text) || text.includes(existing))) return;
-                    cleanedPrimary.push(text);
-                });
-                if (cleanedPrimary.length) return cleanedPrimary.slice(0, 3);
+                const primary = mergeKnowledgeLines(data.knowledgeMethodology).filter(isUsefulKnowledgeLine);
+                const teaching = mergeKnowledgeLines(data.teachingPoints || extractTeachingPointLines(data.followUp));
+                const merged = mergeKnowledgeLines([...primary, ...teaching]);
+                if (merged.length) return merged.slice(0, 4);
 
-                const cards = Array.isArray(data.knowledgeCards) ? data.knowledgeCards : [];
-                return cards
-                    .map(item => String(item || '').trim())
-                    .filter(item => isUsefulKnowledgeLine(item) && (item.length >= 12 || /[。；：]/.test(item)))
-                    .slice(0, 3);
+                const cards = mergeKnowledgeLines(data.knowledgeCards)
+                    .filter(item => isUsefulKnowledgeLine(item) && (item.length >= 12 || /[。；：]/.test(item)));
+                return cards.slice(0, 3);
+            }
+
+            function getSaveableKnowledgeLines(content, structured = null) {
+                const data = structured || parseStructuredReply(content);
+                const fromData = getKnowledgeMethodologyLines(data);
+                if (fromData.length) return fromData;
+                const fallbackText = data
+                    ? [data.followUp, data.stemUnderstanding, data.answer].filter(Boolean).join('\n')
+                    : String(content || '');
+                return extractTeachingPointLines(fallbackText || String(content || ''));
+            }
+
+            function getVisibleFollowUp(data) {
+                const raw = String(data && data.followUp || '').trim();
+                if (!raw) return '';
+                if (!getKnowledgeMethodologyLines(data).length) return raw;
+                return stripTeachingPointBlock(raw);
+            }
+
+            function renderUnstructuredReplyHtml(content) {
+                const body = getReplyDisplayText(content);
+                const items = extractTeachingPointLines(body);
+                const displayBody = items.length ? stripTeachingPointBlock(body) : body;
+                const knowledgeHtml = items.length
+                    ? renderKnowledgeMethodologySection({ teachingPoints: items, followUp: body })
+                    : '';
+                return `${renderMarkdown(displayBody)}${knowledgeHtml}`;
             }
 
             function renderKnowledgeMethodologySection(data, options = {}) {
@@ -4250,7 +4575,7 @@
                     return `
                     <div class="chat-knowledge-item" data-knowledge-index="${index}">
                         <div class="chat-knowledge-text">${renderPlainText(item)}</div>
-                        <button type="button" class="chat-knowledge-save-btn${already ? ' is-saved' : ''}" data-save-knowledge-item data-knowledge-index="${index}" title="把这条知识点或方法论原文存入笔记">${already ? '已存' : '存入'}</button>
+                        <button type="button" class="chat-knowledge-save-btn${already ? ' is-saved' : ''}" data-save-knowledge-item data-knowledge-index="${index}" title="把这条教学要点存入笔记">${already ? '已存' : '存入'}</button>
                     </div>
                 `;
                 }).join('');
@@ -4259,13 +4584,13 @@
                 const bulkBtn = options.includeBulkSave === false
                     ? ''
                     : (allSaved
-                        ? `<button type="button" class="chat-save-note-btn is-saved" data-save-note-btn title="这些知识点已在笔记中"><i class="fa-solid fa-check"></i><span>已存入</span></button>`
-                        : `<button type="button" class="chat-save-note-btn" data-save-note-btn title="把所有知识点与方法论原文存入笔记"><i class="fa-regular fa-bookmark"></i><span>全部存入</span></button>`);
+                        ? `<button type="button" class="chat-save-note-btn is-saved" data-save-note-btn title="这些教学要点已在笔记中"><i class="fa-solid fa-check"></i><span>已存入</span></button>`
+                        : `<button type="button" class="chat-save-note-btn" data-save-note-btn title="把教学要点一键存入笔记"><i class="fa-regular fa-bookmark"></i><span>存入笔记</span></button>`);
 
                 return `
                     <div class="chat-knowledge-section" data-knowledge-section>
                         <div class="chat-knowledge-head">
-                            <span class="chat-structured-label">知识点与方法论</span>
+                            <span class="chat-structured-label">教学要点</span>
                             ${bulkBtn}
                         </div>
                         <div class="chat-knowledge-list">${listHtml}</div>
@@ -4315,11 +4640,12 @@
                     `
                     : '';
 
-                const followUpHtml = data.followUp
+                const followUpText = getVisibleFollowUp(data);
+                const followUpHtml = followUpText
                     ? `
                         <div class="chat-structured-card">
-                            ${/^(为什么不能填|为什么不是|为什么不选)/.test(data.followUp) ? '<span class="chat-structured-label">补充说明</span>' : ''}
-                            <div class="chat-structured-text">${renderPlainText(data.followUp)}</div>
+                            ${/^(为什么不能填|为什么不是|为什么不选)/.test(followUpText) ? '<span class="chat-structured-label">补充说明</span>' : ''}
+                            <div class="chat-structured-text">${renderPlainText(followUpText)}</div>
                         </div>
                     `
                     : '';
@@ -4331,10 +4657,10 @@
                             <span class="chat-structured-badge ${data.supported ? 'is-ok' : 'is-muted'}">${data.supported ? '讲题结果' : '暂不支持'}</span>
                             ${metaParts.length ? `<span class="chat-structured-meta">${metaParts.map(item => escapeHtml(item)).join(' · ')}</span>` : ''}
                         </div>
-                        ${knowledgeHtml}
                         ${explanationHtml}
                         ${answerHtml}
                         ${distractorHtml}
+                        ${knowledgeHtml}
                         ${followUpHtml}
                     </div>
                 `;
@@ -4381,6 +4707,7 @@
             }
 
             let chatStickToBottom = true;
+            let keepThinkingInView = false;
 
             function isChatNearBottom(threshold = 96) {
                 if (!chatWindow) return true;
@@ -4390,6 +4717,17 @@
             function scrollChatToBottom(force = false) {
                 if (!chatWindow) return;
                 if (!force && !chatStickToBottom) return;
+                if (keepThinkingInView) {
+                    const thinking = chatWindow.querySelector('.message-animate:last-child .chat-thinking-panel');
+                    if (thinking) {
+                        const chatRect = chatWindow.getBoundingClientRect();
+                        const headerRect = thinking.getBoundingClientRect();
+                        if (headerRect.top < chatRect.top + 4 || headerRect.top > chatRect.top + 72) {
+                            scrollChatToElement(thinking, 8);
+                        }
+                        return;
+                    }
+                }
                 chatWindow.scrollTop = chatWindow.scrollHeight;
             }
 
@@ -4457,39 +4795,6 @@
                 wrapper.appendChild(top);
 
                 const animatedFields = [];
-                const knowledgeItems = getKnowledgeMethodologyLines(data);
-                if (knowledgeItems.length) {
-                    const section = document.createElement('div');
-                    section.className = 'chat-knowledge-section';
-                    section.dataset.knowledgeSection = '1';
-                    const allSaved = knowledgeItems.every(item => isKnowledgeItemSaved(item));
-                    section.innerHTML = `
-                        <div class="chat-knowledge-head">
-                            <span class="chat-structured-label">知识点与方法论</span>
-                            <button type="button" class="chat-save-note-btn${allSaved ? ' is-saved' : ''}" data-save-note-btn title="${allSaved ? '这些知识点已在笔记中' : '把所有知识点与方法论原文存入笔记'}">
-                                ${allSaved ? '<i class="fa-solid fa-check"></i><span>已存入</span>' : '<i class="fa-regular fa-bookmark"></i><span>全部存入</span>'}
-                            </button>
-                        </div>
-                        <div class="chat-knowledge-list"></div>
-                    `;
-                    const list = section.querySelector('.chat-knowledge-list');
-                    knowledgeItems.forEach((item, index) => {
-                        const already = isKnowledgeItemSaved(item);
-                        const row = document.createElement('div');
-                        row.className = 'chat-knowledge-item';
-                        row.dataset.knowledgeIndex = String(index);
-                        row.innerHTML = `
-                            <div class="chat-knowledge-text"></div>
-                            <button type="button" class="chat-knowledge-save-btn${already ? ' is-saved' : ''}" data-save-knowledge-item data-knowledge-index="${index}" title="把这条知识点或方法论原文存入笔记">${already ? '已存' : '存入'}</button>
-                        `;
-                        list.appendChild(row);
-                        animatedFields.push({
-                            element: row.querySelector('.chat-knowledge-text'),
-                            text: item
-                        });
-                    });
-                    wrapper.appendChild(section);
-                }
 
                 const explanationLines = getStructuredExplanationLines(data);
                 if (explanationLines.length) {
@@ -4542,14 +4847,49 @@
                     wrapper.appendChild(section);
                 }
 
-                if (data.followUp) {
+                const knowledgeItems = getKnowledgeMethodologyLines(data);
+                if (knowledgeItems.length) {
+                    const section = document.createElement('div');
+                    section.className = 'chat-knowledge-section';
+                    section.dataset.knowledgeSection = '1';
+                    const allSaved = knowledgeItems.every(item => isKnowledgeItemSaved(item));
+                    section.innerHTML = `
+                        <div class="chat-knowledge-head">
+                            <span class="chat-structured-label">教学要点</span>
+                            <button type="button" class="chat-save-note-btn${allSaved ? ' is-saved' : ''}" data-save-note-btn title="${allSaved ? '这些教学要点已在笔记中' : '把教学要点一键存入笔记'}">
+                                ${allSaved ? '<i class="fa-solid fa-check"></i><span>已存入</span>' : '<i class="fa-regular fa-bookmark"></i><span>存入笔记</span>'}
+                            </button>
+                        </div>
+                        <div class="chat-knowledge-list"></div>
+                    `;
+                    const list = section.querySelector('.chat-knowledge-list');
+                    knowledgeItems.forEach((item, index) => {
+                        const already = isKnowledgeItemSaved(item);
+                        const row = document.createElement('div');
+                        row.className = 'chat-knowledge-item';
+                        row.dataset.knowledgeIndex = String(index);
+                        row.innerHTML = `
+                            <div class="chat-knowledge-text"></div>
+                            <button type="button" class="chat-knowledge-save-btn${already ? ' is-saved' : ''}" data-save-knowledge-item data-knowledge-index="${index}" title="把这条教学要点存入笔记">${already ? '已存' : '存入'}</button>
+                        `;
+                        list.appendChild(row);
+                        animatedFields.push({
+                            element: row.querySelector('.chat-knowledge-text'),
+                            text: item
+                        });
+                    });
+                    wrapper.appendChild(section);
+                }
+
+                const followUpText = getVisibleFollowUp(data);
+                if (followUpText) {
                     const card = document.createElement('div');
                     card.className = 'chat-structured-card';
-                    card.innerHTML = `${/^(为什么不能填|为什么不是|为什么不选)/.test(data.followUp) ? '<span class="chat-structured-label">补充说明</span>' : ''}<div class="chat-structured-text"></div>`;
+                    card.innerHTML = `${/^(为什么不能填|为什么不是|为什么不选)/.test(followUpText) ? '<span class="chat-structured-label">补充说明</span>' : ''}<div class="chat-structured-text"></div>`;
                     wrapper.appendChild(card);
                     animatedFields.push({
                         element: card.querySelector('.chat-structured-text'),
-                        text: data.followUp
+                        text: followUpText
                     });
                 }
 
@@ -4568,17 +4908,28 @@
             }
 
             async function animateAiBubbleContent(bubble, content) {
-                const target = bubble.querySelector('.chat-ai-reply-body') || bubble;
-                const structured = parseStructuredReply(content);
-                if (structured && structured.supported) {
-                    await animateStructuredReplyBubble(target, structured);
-                    scrollChatToBottom();
-                    return;
+                const thinkingPanel = bubble.querySelector('.chat-thinking-panel');
+                const target = bubble.querySelector('.chat-ai-reply-body') || (thinkingPanel ? null : bubble);
+                if (!target) return;
+                const previousKeepThinking = keepThinkingInView;
+                if (thinkingPanel) {
+                    keepThinkingInView = true;
+                    scrollChatToElement(thinkingPanel, 8);
                 }
-                const body = getReplyDisplayText(content);
-                await animateTextReveal(target, body, renderPlainText);
-                target.innerHTML = renderMarkdown(body);
-                scrollChatToBottom();
+                try {
+                    const structured = parseStructuredReply(content);
+                    if (structured && structured.supported) {
+                        await animateStructuredReplyBubble(target, structured);
+                        scrollChatToBottom();
+                        return;
+                    }
+                    const body = getReplyDisplayText(content);
+                    await animateTextReveal(target, body, renderPlainText);
+                    target.innerHTML = renderUnstructuredReplyHtml(content);
+                    scrollChatToBottom();
+                } finally {
+                    keepThinkingInView = previousKeepThinking;
+                }
             }
 
             function renderAiMessageContent(content) {
@@ -4593,7 +4944,7 @@
                 }
                 const body = getReplyDisplayText(content);
                 return {
-                    html: renderMarkdown(body),
+                    html: renderUnstructuredReplyHtml(content),
                     isStructured: false,
                     preview: body,
                     structured: null
@@ -4620,59 +4971,271 @@
                     .replace(/\[图片\]/g, ' ')
                     .replace(/我上传了一张图片[:：]?\s*/g, ' ')
                     .replace(/补充说明[:：]?\s*/g, ' ')
+                    .replace(/请先帮我确认收到并给出分析建议。?/g, ' ')
+                    .replace(/请结合图片继续讲这道题。?/g, ' ')
                     .replace(/```[\s\S]*?```/g, ' ')
                     .replace(/\s+/g, ' ')
                     .replace(/^[\s，。！？、,:：；;“"'`]+|[\s，。！？、,:：；;“"'`]+$/g, '')
                     .trim();
             }
 
-            function summarizeStructuredQuestionFocus(data) {
-                const raw = cleanTitleText(data && data.stemUnderstanding || '');
-                if (!raw) return '';
-
-                const simplified = raw
-                    .replace(/^(这是关于|这是一道|这道题是|这道题|这句话是|这句话|题干为|用户在问|当前消息里|当前内容里|这是|这是一则|这是一篇|这是对)\s*/g, '')
-                    .replace(/，?(考查|需要填入|需填入|要求|属于|是一道|是关于).*$|。.*$/g, '')
-                    .replace(/^['"'“”‘’]|['"'“”‘’]$/g, '')
-                    .trim();
-
-                return trimTitleLength(simplified || raw, 22);
+            function isImageFileNameSource(text) {
+                const raw = String(text || '').trim().replace(/^\[图片\]\s*/g, '').trim();
+                if (!raw) return false;
+                if (/[\u4e00-\u9fa5]/.test(raw) && raw.length > 18) return false;
+                if (/\.(png|jpe?g|gif|webp|bmp|heic|svg)[a-z]{0,4}$/i.test(raw)) return true;
+                if (/^(image|img|photo|picture|screenshot|untitled|download|微信图片|mmexport)([._\-\s?].*)?$/i.test(raw)) return true;
+                return false;
             }
 
-            function summarizeQuestionTitle(rawInput, structuredData = null, maxLength = 18) {
-                const raw = cleanTitleText(rawInput);
-                const structuredSummary = summarizeStructuredQuestionFocus(structuredData);
-                if (!raw) {
-                    return trimTitleLength(structuredSummary || '', maxLength);
-                }
+            function isJunkFlashcardSource(text) {
+                const raw = cleanTitleText(text);
+                if (!raw) return true;
+                if (isImageFileNameSource(raw) || isImageFileNameSource(text)) return true;
+                if (/^\[图片\]/.test(String(text || '').trim())) return true;
+                if (isAskOnlyPrompt(raw)) return true;
+                if (isPassageDump(raw)) return true;
+                return false;
+            }
 
-                const directMatch = raw.match(/(为什么不能填\s*[A-Za-z][A-Za-z-]*|为什么不是\s*[A-Za-z][A-Za-z-]*|为什么不选\s*[A-D])/i);
-                if (directMatch) {
-                    return trimTitleLength(directMatch[1].replace(/\s+/g, ''), maxLength);
-                }
-
-                const firstSentence = raw.split(/[\n。！？!?]/)[0].trim();
-                const normalized = firstSentence
-                    .replace(/^(请|帮我|麻烦|可以|能不能|想|需要|请你|老师|帮忙|能否)?\s*/g, '')
-                    .replace(/^(帮我把|请把|把|将)\s*/g, '')
-                    .replace(/^(把|将)?\s*(这道题|这题|题目|这道英语题|这道语法题|这道阅读题|这个句子|这页|这张图里的题)\s*/g, '')
-                    .replace(/^(讲|讲解|分析|解释|看看|看下|解答|解题|判断|总结|翻译|说明|批改|做一下|做个|讲一下|分析一下|解释一下|存到闪卡里|加入闪卡|保存到闪卡|整理成闪卡)\s*/g, '')
-                    .replace(/^(存到闪卡里|加入闪卡|保存到闪卡|整理成闪卡)\s*/g, '')
-                    .replace(/\s*(怎么做|什么意思|怎么理解|可以吗|行吗|对吗|谢谢|存到闪卡里吧|存到闪卡里|加入闪卡吧|加入闪卡|保存起来吧|保存起来|收起来吧|记到闪卡里吧|记到闪卡里)?$/g, '')
+            function stripAskPrefix(text) {
+                return String(text || '')
+                    .replace(/^(?:这是|这道|请看)?\s*(?:阅读理解|阅读题|阅读|完形填空|完型|语法填空|语法|七选五)?[，,、\s]*/g, '')
+                    .replace(/^(?:帮我|请|麻烦|可以)?\s*(?:讲|讲解|分析|看看|看下|做)\s*(?:一下)?\s*(?:第\s*\d+\s*[题空小题])?[。.!！]?\s*/g, '')
                     .trim();
+            }
 
-                if (normalized && normalized.length >= 4) {
-                    return trimTitleLength(normalized, maxLength);
+            function isAskOnlyPrompt(text) {
+                const raw = cleanTitleText(text);
+                if (!raw) return true;
+                if (isBlankFollowup(raw)) return true;
+                const remainder = stripAskPrefix(raw);
+                if (remainder && !/^(阅读理解|阅读题|阅读|完形填空|完型|语法填空|语法|七选五|这道题|这题|题目)$/.test(remainder)) {
+                    return false;
                 }
+                return true;
+            }
 
-                return trimTitleLength(structuredSummary || firstSentence || raw, maxLength);
+            function isPassageDump(text) {
+                const raw = String(text || '').replace(/\s+/g, ' ').trim();
+                if (!raw) return false;
+                if (raw.length > 72) return true;
+                const words = raw.match(/[A-Za-z]+/g) || [];
+                return words.length >= 16;
+            }
+
+            function isMissingQuestionMaterial(text) {
+                return /用户仅提供|只输入了|只给了题号|仅提供题号|未提供(?:该)?空格|未提供第|没有提供.{0,8}(?:句|题干|选项|原文)|题干信息缺失|请补充第|请补齐第|无法判断空格考点|没法判断空格|未提供该空格所在|未提供空格所在/.test(String(text || ''));
+            }
+
+            function isIncompleteTeachingCard(data) {
+                if (!data) return true;
+                const blob = [data.stemUnderstanding, data.answer, data.followUp, data.unsupportedReason].filter(Boolean).join('\n');
+                if (data.needMoreContext) return true;
+                if (isMissingQuestionMaterial(blob)) return true;
+                if (/先补材料|只有题型、没有题目|没法判断空格|还没有原文、题干|没法讲具体哪一题/.test(blob)) return true;
+                if (/需要确认/.test(data.answer || '') && /先补|没有题目|没法讲|需要补充/.test(blob)) return true;
+                return false;
+            }
+
+            function resolveFlashcardSourceQuestion(text) {
+                const cleaned = cleanTitleText(text).replace(/\s+/g, ' ').trim();
+                if (!cleaned || isJunkFlashcardSource(cleaned)) return '';
+                return cleaned;
+            }
+
+            function extractQuestionStem(text, preferredLabel = '') {
+                const raw = String(text || '').replace(/\r/g, '');
+                if (!raw.trim()) return '';
+                const preferred = String(preferredLabel || '').replace(/\D/g, '');
+                const numbered = [];
+                const questionLike = [];
+                raw.split(/\n+/).forEach(line => {
+                    const item = line.trim();
+                    if (!item) return;
+                    const match = item.match(/^(?:第\s*)?(\d+)\s*[.．、)）]\s+(.+)$/);
+                    if (match) numbered.push({ n: match[1], text: item });
+                    if (/^(?:第\s*\d+\s*[题空]|Which of the following|According to|Why |What |The (?:passage|author|text|best title)|It can be inferred|The main idea)/i.test(item)) {
+                        questionLike.push(item);
+                    }
+                });
+                if (preferred) {
+                    const hit = numbered.find(item => item.n === preferred);
+                    if (hit) return trimTitleLength(hit.text, 36);
+                }
+                if (questionLike[0]) return trimTitleLength(questionLike[0], 36);
+                if (numbered[0]) return trimTitleLength(numbered[0].text, 36);
+                const inlineNumbered = raw.match(/((?:第\s*)?\d+\s*[.．、)）]\s+[^\n]{8,80})/);
+                if (inlineNumbered) return trimTitleLength(inlineNumbered[1], 36);
+                const asked = raw.match(/([A-Z][^?\n]{12,80}\?)/);
+                if (asked) return trimTitleLength(asked[1], 36);
+                return '';
+            }
+
+            function extractBlankLabel(data, rawInput = '') {
+                const sources = [
+                    rawInput,
+                    data && data.stemUnderstanding,
+                    data && data.answer,
+                    data && data.subtype
+                ].filter(Boolean).join('\n');
+                const question = String(sources).match(/第\s*(\d+)\s*题/);
+                if (question) return `第${question[1]}题`;
+                const blank = String(sources).match(/第\s*(\d+)\s*空/);
+                if (blank) return `第${blank[1]}空`;
+                const parenthetical = String(sources).match(/\((\d{1,2})\)\s*[A-Za-z\u4e00-\u9fa5]/);
+                if (parenthetical) return `第${parenthetical[1]}空`;
+                return '';
+            }
+
+            function isChitChatMessage(text) {
+                const raw = cleanTitleText(text);
+                if (!raw) return false;
+                return /^(你好|您好|嗨|哈喽|hello|hi|在吗|在不在|谢谢|谢谢老师|谢谢你|多谢|好的|嗯嗯|哦哦|喔|收到|明白了|好|ok)$/i.test(raw);
+            }
+
+            function isTypeNumberTitle(text) {
+                return /^(语法|完型|完形|阅读|七选五|改错|翻译|词汇|讲题|综合|长难句)\s*[·•、/／\-—–]?\s*第\s*\d+\s*[空题]$/.test(cleanTitleText(text));
+            }
+
+            function isStorySpecificText(text) {
+                const raw = String(text || '').replace(/\s+/g, ' ').trim();
+                if (!raw) return false;
+                if (/^\d+\s*[.．、)]\s*(?:Why|What|Which|According|The passage|The author|It can)/i.test(raw)) return true;
+                if (/^(?:Why|What|Which)\s+(?:did|does|do|is|was|can|would)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b/.test(raw)) return true;
+                if (/[\u4e00-\u9fa5]{2,4}(?:为什么|为何).{0,8}(?:回家|扶贫|毕业|放弃|返回|来自|回到)/.test(raw)) return true;
+                if (/(?:回家|扶贫|毕业|回到家乡|来自一个).{0,8}(?:原因|为什么)/.test(raw)) return true;
+                if (/^(?:Li Hua|the villagers|the museum)\b/i.test(raw)) return true;
+                return false;
+            }
+
+            function isReadingLikeType(questionType) {
+                return /阅读|七选五/.test(String(questionType || ''));
+            }
+
+            function isGrammarLikeType(questionType, extra = '') {
+                return /语法|词汇|改错|长难句/.test(`${questionType || ''} ${extra || ''}`);
             }
 
             function isGenericChatTitle(title) {
                 const normalized = cleanTitleText(title).toLowerCase();
                 if (!normalized) return true;
-                if (/本题|这道题是|该题是|空格后/.test(normalized)) return true;
-                return /^(新对话|图片提问|图片题讲解|图片讲题|题目|这道题|这题|本题|英语题|讲题|讲解|分析|解释|看看|解答|题目讲解|帮我分析|帮我讲解|图片题|冠词|语法|完形|完型|阅读|第\d+空)$/.test(normalized);
+                if (isImageFileNameSource(normalized) || isImageFileNameSource(title)) return true;
+                if (isChitChatMessage(normalized)) return true;
+                if (isTypeNumberTitle(normalized)) return true;
+                if (/^(本题|这道题是|该题是)$/.test(normalized)) return true;
+                if (isAskOnlyPrompt(normalized) || isAskOnlyPrompt(title)) return true;
+                return /^(新对话|图片提问|图片题讲解|图片讲题|题目|这道题|这题|本题|英语题|讲题|讲解|分析|解释|看看|解答|题目讲解|帮我分析|帮我讲解|帮我讲阅读|图片题|冠词|语法|完形|完型|阅读|七选五|第\d+空|第\d+题)$/.test(normalized);
+            }
+
+            function isWeakTopicTitle(title) {
+                const raw = String(title || '').trim();
+                if (!raw) return true;
+                if (isImageFileNameSource(raw)) return true;
+                if (isChitChatMessage(raw) || isAskOnlyPrompt(raw) || isPassageDump(raw)) return true;
+                if (isStorySpecificText(raw) || isTypeNumberTitle(raw)) return true;
+                if (isGenericChatTitle(raw)) return true;
+                if (/最容易错在哪|讲题闪卡|图片讲题/.test(raw)) return true;
+                if (/^第\s*\d+\s*[空题]/.test(raw)) return true;
+                return false;
+            }
+
+            function isWeakFlashcardTitle(title) {
+                return isWeakTopicTitle(title);
+            }
+
+            function isTitleStopWord(word) {
+                return /^(this|that|from|with|have|been|come|question|there|their|what|when|which|the|and|for|students|whether|before|after|passage|author|text|usage|article|understand|tests|about|into|over)$/i.test(String(word || ''));
+            }
+
+            function getMethodStatementMap() {
+                return {
+                    '细节题': '细节题先回原文定位',
+                    '主旨题': '主旨题看首尾和主题',
+                    '推断题': '推断不选原文原句',
+                    '标题题': '标题看人物事件或品质',
+                    '态度题': '态度题盯作者用词',
+                    '词义题': '词义题回原文看搭配',
+                    '冠词': '冠词看特指和音素',
+                    '不定冠词': 'a/an 看元音音素',
+                    '定冠词': '独一无二才用 the',
+                    '非谓语': '已有谓语多用非谓语',
+                    '时态': '时态先看时间和先后',
+                    '语态': '语态先看主被动',
+                    '主谓一致': '谓语要和主语一致',
+                    '定语从句': '从句缺人用 who，缺物用 which',
+                    '名词性从句': '从句完整用 that',
+                    '状语从句': '状语从句先看逻辑关系',
+                    '词性转换': '词性转换先看句子成分',
+                    '比较级': '比较级看对象和程度',
+                    '动词辨析': '完型动词先看时态和搭配',
+                    '名词辨析': '完型名词先看复现和搭配',
+                    '形容词辨析': '完型形词先看态度',
+                    '副词辨析': '完型副词先看修饰对象',
+                    '短语辨析': '短语要看整块意思',
+                    '关系词': '关系词看从句缺什么',
+                    '衔接': '七选五先看衔接和复现',
+                    '词汇': '词汇先看搭配和语义'
+                };
+            }
+
+            function getMethodQuestionMap() {
+                return {
+                    '细节题': '细节题怎么定位？',
+                    '主旨题': '主旨题先看哪里？',
+                    '推断题': '推断题为什么不抄原句？',
+                    '标题题': '标题通常落在哪？',
+                    '态度题': '态度题看什么？',
+                    '词义题': '词义题怎么回原文？',
+                    '冠词': '冠词怎么选 a/an/the？',
+                    '不定冠词': 'a 和 an 看什么？',
+                    '定冠词': '什么时候用 the？',
+                    '非谓语': '什么时候用非谓语？',
+                    '时态': '时态先看什么？',
+                    '语态': '语态先看什么？',
+                    '主谓一致': '主谓一致看什么？',
+                    '定语从句': '定语从句关系词怎么选？',
+                    '名词性从句': '名词性从句用 that 还是 what？',
+                    '状语从句': '状语从句先看什么？',
+                    '词性转换': '词性转换先看什么？',
+                    '比较级': '比较级怎么判断？',
+                    '动词辨析': '完型动词先看什么？',
+                    '名词辨析': '完型名词先看什么？',
+                    '形容词辨析': '完型形词先看什么？',
+                    '副词辨析': '完型副词先看什么？',
+                    '短语辨析': '短语怎么区分？',
+                    '关系词': '关系词怎么选？',
+                    '衔接': '七选五怎么衔接？',
+                    '词汇': '词汇题先看什么？'
+                };
+            }
+
+            function getTypeStatementMap() {
+                return {
+                    '语法': '语法填空先看主干',
+                    '完型': '完型先看复现和搭配',
+                    '完形': '完型先看复现和搭配',
+                    '阅读': '阅读先定题型再回文',
+                    '七选五': '七选五先看衔接和复现',
+                    '改错': '改错先找谓语和一致',
+                    '翻译': '翻译先看句式和搭配',
+                    '词汇': '词汇先看搭配和语义',
+                    '长难句': '长难句先拆主干'
+                };
+            }
+
+            function getTypeQuestionMap() {
+                return {
+                    '语法': '语法填空先看什么？',
+                    '完型': '完型先看什么？',
+                    '完形': '完型先看什么？',
+                    '阅读': '阅读怎么定题型？',
+                    '七选五': '七选五怎么衔接？',
+                    '改错': '改错先找什么？',
+                    '翻译': '翻译先看什么？',
+                    '词汇': '词汇题先看什么？',
+                    '长难句': '长难句怎么拆？'
+                };
             }
 
             function stripTypePrefixFromTitle(text) {
@@ -4694,55 +5257,250 @@
                 return cleaned;
             }
 
-            function extractTitleAnchor(rawInput, structured) {
-                const sources = [
-                    structured && structured.answer,
+            function methodParts(focus) {
+                return String(focus || '').split(/[\/、，,·•]/).map(item => item.trim()).filter(Boolean);
+            }
+
+            function lookupMethodStatement(focus, questionType) {
+                const statements = getMethodStatementMap();
+                const types = getTypeStatementMap();
+                for (const part of methodParts(focus)) {
+                    if (statements[part]) return statements[part];
+                }
+                return types[questionType] || '';
+            }
+
+            function lookupMethodQuestion(focus, questionType) {
+                const questions = getMethodQuestionMap();
+                const types = getTypeQuestionMap();
+                for (const part of methodParts(focus)) {
+                    if (questions[part]) return questions[part];
+                }
+                return types[questionType] || '';
+            }
+
+            function extractUserChallenge(text) {
+                const raw = cleanTitleText(text);
+                if (!raw) return null;
+                let match = raw.match(/为什么不能填\s*[“"'`「]?([A-Za-z][A-Za-z\-']*|[A-Da-d]|[\u4e00-\u9fa5]{1,8})/);
+                if (match) return { kind: 'fill', value: match[1] };
+                match = raw.match(/为什么不是\s*[“"'`「]?([A-Za-z][A-Za-z\-']*|[\u4e00-\u9fa5]{1,8})/);
+                if (match) return { kind: 'fill', value: match[1] };
+                match = raw.match(/能不能填\s*[“"'`「]?([A-Za-z][A-Za-z\-']*)/);
+                if (match) return { kind: 'fill', value: match[1] };
+                match = raw.match(/为什么不选\s*[“"'`]?([A-Da-d])/i);
+                if (match) return { kind: 'choice', value: match[1].toUpperCase() };
+                if (/区别|怎么分|不同|还是/.test(raw)) {
+                    match = raw.match(/[“"'《「]([^”"'》」]{1,20})[”"'》」]\s*和\s*[“"'《「]?([A-Za-z][A-Za-z\-']*(?:\s+[A-Za-z][A-Za-z\-']*){0,2}|[\u4e00-\u9fa5]{1,8})/);
+                    if (match) return { kind: 'contrast', value: match[1].trim(), other: match[2].trim() };
+                    match = raw.match(/\b([A-Za-z][A-Za-z\-']+(?:\s+[A-Za-z][A-Za-z\-']+){0,2})\s*和\s*([A-Za-z][A-Za-z\-']+(?:\s+[A-Za-z][A-Za-z\-']+){0,2})\b/);
+                    if (match && !isTitleStopWord(match[1]) && !isTitleStopWord(match[2])) {
+                        return { kind: 'contrast', value: match[1], other: match[2] };
+                    }
+                }
+                return null;
+            }
+
+            function extractGrammarAnchor(userText, structured, ocrText) {
+                const grammarSource = [
+                    userText,
                     structured && structured.stemUnderstanding,
-                    rawInput
+                    looksLikeGrammarFillText(ocrText || '') ? ocrText : '',
+                    looksLikeGrammarFillText((structured && structured.answer) || '') ? structured.answer : ''
                 ].filter(Boolean).join('\n');
 
-                const hint = sources.match(/\(([A-Za-z][A-Za-z\-']{2,18})\)|（([A-Za-z][A-Za-z\-']{2,18})）/);
-                if (hint) return hint[1] || hint[2];
+                const answerWord = String((structured && structured.answer) || '')
+                    .replace(/^答案[:：]\s*/, '')
+                    .trim();
 
-                const quoted = String(rawInput || '').match(/[“"'《]([^”"'》]{2,20})[”"'》]/);
-                if (quoted && quoted[1] && !isGenericChatTitle(quoted[1])) return quoted[1].trim();
+                if (!grammarSource) {
+                    if (/^[A-Za-z][A-Za-z\-']{2,16}$/.test(answerWord) && !isTitleStopWord(answerWord)) {
+                        return answerWord;
+                    }
+                    return '';
+                }
 
-                const named = sources.match(/[\u4e00-\u9fa5]{2,4}(?=放弃|回到|扶贫|来自)/);
-                if (named && named[0] && !isGenericChatTitle(named[0])) return named[0];
+                const afterBlank = grammarSource.match(/空(?:格)?后(?:面)?(?:是|为)\s*([A-Za-z][A-Za-z\-']{1,24}|[\u4e00-\u9fa5]{1,8})/);
+                if (afterBlank && afterBlank[1] && !isTitleStopWord(afterBlank[1])) {
+                    return afterBlank[1];
+                }
 
-                const skip = /^(this|that|from|with|have|been|come|question|there|their|what|when|which)\b/i;
-                const phrases = String(sources).matchAll(/\b([A-Za-z][A-Za-z'’\-]{4,16}(?:\s+[A-Za-z][A-Za-z'’\-]{3,16}){1,2})\b/g);
-                for (const match of phrases) {
-                    const phrase = String(match[1] || '').trim();
-                    if (phrase && !skip.test(phrase) && !/^(come from|i come|it is|there are)/i.test(phrase)) {
-                        return phrase;
+                const hints = String(grammarSource).matchAll(/[（(]([A-Za-z][A-Za-z\-']{2,24})[)）]/g);
+                for (const item of hints) {
+                    const word = item[1];
+                    if (word && !isTitleStopWord(word) && !/^(high|low|medium)$/i.test(word)) {
+                        return word;
+                    }
+                }
+
+                if (/^[A-Za-z][A-Za-z\-']{2,16}$/.test(answerWord) && !isTitleStopWord(answerWord)) {
+                    return answerWord;
+                }
+                return '';
+            }
+
+            function extractTitleAnchor(rawInput, structured) {
+                const challenge = extractUserChallenge(rawInput);
+                if (challenge && challenge.value) return challenge.value;
+                return extractGrammarAnchor(rawInput, structured, '');
+            }
+
+            function fitTitle(text, maxLength) {
+                const source = String(text || '').replace(/\s+/g, ' ').trim();
+                if (!source || source.length > maxLength) return '';
+                return source;
+            }
+
+            function compressRuleLine(text, maxLength = 16) {
+                let source = cleanTitleText(text);
+                if (!source || isStorySpecificText(source) || isPassageDump(source) || isAskOnlyPrompt(source)) return '';
+                source = source.replace(/^(如果|若|当)/, '').replace(/[。；;！!？?]+$/g, '').trim();
+                const arrow = source.split(/\s*(?:→|->|则)\s*/);
+                if (arrow.length > 1 && arrow[arrow.length - 1].length >= 4 && arrow[arrow.length - 1].length <= maxLength) {
+                    source = arrow[arrow.length - 1];
+                }
+                if (source.length > maxLength) {
+                    const clauses = source.split(/[，,]/).map(item => item.trim()).filter(Boolean);
+                    const usable = clauses.find(item => item.length >= 6 && item.length <= maxLength) || '';
+                    source = usable;
+                }
+                if (!source || isWeakTopicTitle(source)) return '';
+                return fitTitle(source, maxLength);
+            }
+
+            function collectTitleContext(userText, structured, ocrText) {
+                const cleaned = cleanTitleText(userText);
+                const user = cleaned && !isJunkFlashcardSource(cleaned) ? cleaned : '';
+                const questionType = sanitizeStructuredMeta(structured && structured.questionType || '').replace(/^完形$/, '完型');
+                const subtype = sanitizeStructuredMeta(structured && structured.subtype || '');
+                const focus = titleFocusFromSubtype(subtype);
+                return {
+                    user,
+                    questionType,
+                    subtype,
+                    focus,
+                    challenge: extractUserChallenge(userText),
+                    anchor: extractGrammarAnchor(userText, structured, ocrText),
+                    methodLine: structured ? (getKnowledgeMethodologyLines(structured)[0] || '') : '',
+                    statement: lookupMethodStatement(focus, questionType),
+                    question: lookupMethodQuestion(focus, questionType)
+                };
+            }
+
+            function buildTopicTitle(kind, userText, structured, ocrText = '', maxLength) {
+                const isFlashcard = kind === 'flashcard';
+                const limit = maxLength || (isFlashcard ? 22 : 18);
+                const ctx = collectTitleContext(userText, structured, ocrText);
+                const candidates = [];
+
+                if (ctx.challenge && ctx.challenge.kind === 'fill') {
+                    candidates.push(isFlashcard ? `为什么不能填 ${ctx.challenge.value}？` : `不宜填 ${ctx.challenge.value}`);
+                    if (ctx.anchor && ctx.anchor.toLowerCase() !== String(ctx.challenge.value).toLowerCase()) {
+                        candidates.push(isFlashcard ? `${ctx.anchor} 前用哪个冠词？` : `${ctx.anchor} 前要看音素`);
+                    }
+                } else if (ctx.challenge && ctx.challenge.kind === 'contrast') {
+                    candidates.push(isFlashcard
+                        ? `${ctx.challenge.value}/${ctx.challenge.other} 怎么分？`
+                        : `${ctx.challenge.value}/${ctx.challenge.other} 不同`);
+                } else if (ctx.challenge && ctx.challenge.kind === 'choice') {
+                    if (isReadingLikeType(ctx.questionType)) {
+                        candidates.push(isFlashcard ? ctx.question : ctx.statement);
+                    } else {
+                        candidates.push(isFlashcard ? `为什么不选 ${ctx.challenge.value}？` : (ctx.statement || `这里不选 ${ctx.challenge.value}`));
+                    }
+                }
+
+                if (ctx.anchor && /冠词/.test(ctx.focus || ctx.subtype || '')) {
+                    candidates.push(isFlashcard ? `${ctx.anchor} 前用哪个冠词？` : `${ctx.anchor} 前要看音素`);
+                } else if (ctx.anchor && /非谓语/.test(ctx.focus || ctx.subtype || '')) {
+                    candidates.push(isFlashcard ? `${ctx.anchor} 作谓语还是非谓语？` : `${ctx.anchor} 先判断是不是谓语`);
+                } else if (ctx.anchor && /时态|语态|词性/.test(ctx.focus || ctx.subtype || '')) {
+                    candidates.push(isFlashcard ? `${ctx.anchor} 该怎么变形？` : `${ctx.anchor} 要先判断成分`);
+                } else if (ctx.anchor && /关系词|从句/.test(ctx.focus || ctx.subtype || '')) {
+                    candidates.push(isFlashcard ? `${ctx.anchor} 在从句里干什么？` : `${ctx.anchor} 用来引导从句`);
+                }
+
+                if (isFlashcard && ctx.question) candidates.push(ctx.question);
+                if (ctx.statement) candidates.push(ctx.statement);
+                const compressed = compressRuleLine(ctx.methodLine, limit);
+                if (compressed) candidates.push(compressed);
+
+                for (const item of candidates) {
+                    const fitted = fitTitle(String(item || '').replace(/\s+/g, ' ').trim(), limit);
+                    if (fitted && !isWeakTopicTitle(fitted) && !isStorySpecificText(fitted)) {
+                        return fitted;
                     }
                 }
                 return '';
             }
 
+            function summarizeStructuredQuestionFocus(data) {
+                return buildTopicTitle('chat', '', data, '', 16);
+            }
+
+            function summarizeQuestionTitle(rawInput, structuredData = null, maxLength = 18) {
+                return buildTopicTitle('chat', rawInput, structuredData, '', maxLength);
+            }
+
+            function buildFlashcardTopicKey(data, sourceQuestion, ocrText) {
+                const ctx = collectTitleContext(sourceQuestion, data, ocrText);
+                const type = ctx.questionType || '讲题';
+                if (ctx.challenge && ctx.challenge.kind === 'contrast') {
+                    return `${type}|contrast|${ctx.challenge.value}|${ctx.challenge.other}`.toLowerCase();
+                }
+                if (ctx.challenge && ctx.challenge.kind === 'fill') {
+                    return `${type}|fill|${ctx.challenge.value}`.toLowerCase();
+                }
+                if (ctx.challenge && ctx.challenge.kind === 'choice' && !isReadingLikeType(type)) {
+                    return `${type}|choice|${ctx.challenge.value}`.toLowerCase();
+                }
+                if (ctx.anchor) return `${type}|hint|${ctx.anchor}`.toLowerCase();
+                return `${type}|method|${ctx.focus || type}`.toLowerCase();
+            }
+
+            function shouldAutoCreateFlashcard(data, sourceQuestion = '', ocrText = '') {
+                if (!data || !data.supported || isIncompleteTeachingCard(data)) return false;
+                if (/^需要确认$/.test(String(data.answer || '').trim())) return false;
+                const title = buildTopicTitle('flashcard', sourceQuestion, data, ocrText);
+                if (!title || isWeakTopicTitle(title)) return false;
+
+                const challenge = extractUserChallenge(sourceQuestion);
+                const type = sanitizeStructuredMeta(data.questionType || '').replace(/^完形$/, '完型');
+                const focus = titleFocusFromSubtype(data.subtype || '');
+                const grammarMaterial = looksLikeGrammarFillText(`${sourceQuestion}\n${ocrText}\n${data.stemUnderstanding || ''}`)
+                    || looksLikeGrammarFillText(data.answer || '');
+
+                if (challenge && (challenge.kind === 'fill' || challenge.kind === 'contrast')) return true;
+                if (challenge && challenge.kind === 'choice' && !isReadingLikeType(type)) return true;
+                if (isGrammarLikeType(type, focus) && (grammarMaterial || extractGrammarAnchor(sourceQuestion, data, ocrText) || /冠词|非谓语|时态|语态|从句|词性|关系词/.test(focus))) {
+                    return true;
+                }
+                return false;
+            }
+
             function buildChatTitle(messages) {
-                const firstUserMessage = messages.find(msg => msg.sender === 'user' && (msg.content || msg.type === 'image'));
-                if (!firstUserMessage) return '新对话';
-                const firstUserIndex = messages.indexOf(firstUserMessage);
-                const firstAi = messages.slice(firstUserIndex + 1).find(msg => msg.sender === 'ai' && msg.content);
-                const structured = firstAi ? parseStructuredReply(firstAi.content || '') : null;
-                const rawUser = cleanTitleText(firstUserMessage.content || '');
+                if (!Array.isArray(messages) || !messages.length) return '新对话';
+                const pairs = [];
+                messages.forEach((message, index) => {
+                    if (!message || message.sender !== 'user') return;
+                    const isImage = message.type === 'image';
+                    let raw = cleanTitleText(message.content || '');
+                    if (isImageFileNameSource(raw)) raw = '';
+                    if (!isImage && (isChitChatMessage(raw) || !raw)) return;
+                    const ai = messages.slice(index + 1).find(item => item && item.sender === 'ai' && item.content && parseStructuredReply(item.content));
+                    pairs.push({
+                        user: raw,
+                        structured: ai ? parseStructuredReply(ai.content) : null
+                    });
+                });
+                if (!pairs.length) return '新对话';
 
-                if (rawUser && rawUser.length <= 8 && !isGenericChatTitle(rawUser) && !/^\d+$/.test(rawUser) && !/^(完型|完形|语法|阅读)/.test(rawUser)) {
-                    return rawUser;
-                }
-
-                const focus = titleFocusFromSubtype(structured && structured.subtype);
-                const anchor = extractTitleAnchor(rawUser, structured);
-
-                if (focus && anchor && !focus.includes(anchor) && focus.length <= 8) {
-                    return trimTitleLength(`${focus} · ${anchor}`, 18);
-                }
-                if (focus) return trimTitleLength(focus, 16);
-                if (anchor) return trimTitleLength(anchor, 14);
-                if (firstUserMessage.type === 'image' && !rawUser) return '图片讲题';
-                return '新对话';
+                const withChallenge = [...pairs].reverse().find(item => extractUserChallenge(item.user));
+                const withTeaching = [...pairs].reverse().find(item => (
+                    item.structured && !item.structured.needMoreContext && !isIncompleteTeachingCard(item.structured)
+                ));
+                const picked = withChallenge || withTeaching || pairs[pairs.length - 1];
+                return buildTopicTitle('chat', picked.user, picked.structured, '') || '新对话';
             }
 
             async function refreshStoredChatTitles() {
@@ -5567,9 +6325,10 @@
 
             function renderThinkingPanelHtml(snapshot, options = {}) {
                 const finished = options.finished !== false;
-                const collapsed = options.collapsed !== false;
                 const streamText = snapshotToThinkingText(snapshot);
                 if (!streamText) return '';
+                const collapsed = options.collapsed !== false;
+                const previewText = thinkingPreviewText(streamText);
 
                 const durationLabel = snapshot && snapshot.durationMs
                     ? `用时 ${formatThinkingDuration(snapshot.durationMs)}`
@@ -5577,7 +6336,7 @@
 
                 return `
                     <div class="chat-thinking-panel ${finished ? 'is-finished' : 'is-active'} ${collapsed ? 'is-collapsed' : ''}">
-                        <button type="button" class="chat-thinking-toggle" aria-expanded="${collapsed ? 'false' : 'true'}">
+                        <button type="button" class="chat-thinking-toggle" aria-expanded="${collapsed ? 'false' : 'true'}" aria-label="展开或收起思考过程">
                             <span class="chat-thinking-icon" aria-hidden="true"><i class="fa-solid fa-lightbulb"></i></span>
                             <span class="chat-thinking-toggle-copy">
                                 <span class="chat-thinking-toggle-label">已深度思考</span>
@@ -5586,6 +6345,7 @@
                             <span class="chat-thinking-dots" aria-hidden="true"><span></span><span></span><span></span></span>
                             <i class="fa-solid fa-chevron-down chat-thinking-chevron" aria-hidden="true"></i>
                         </button>
+                        <div class="chat-thinking-preview">${escapeHtml(previewText)}</div>
                         <div class="chat-thinking-body">
                             <div class="chat-thinking-stream">${escapeHtml(streamText)}</div>
                         </div>
@@ -5598,6 +6358,7 @@
                 const labelEl = root.querySelector('.chat-thinking-toggle-label');
                 const metaEl = root.querySelector('.chat-thinking-toggle-meta');
                 const streamEl = root.querySelector('.chat-thinking-stream');
+                const previewEl = root.querySelector('.chat-thinking-preview');
                 const startedAt = Date.now();
                 const localTimers = [];
                 let rawThinking = '';
@@ -5647,6 +6408,7 @@
                     if (!streamEl) return;
                     const text = visibleThinkingText();
                     streamEl.textContent = text;
+                    if (previewEl) previewEl.textContent = finished ? thinkingPreviewText(text) : '';
                     const body = root.querySelector('.chat-thinking-body');
                     if (body) body.style.display = text ? '' : 'none';
                     if (body) body.scrollTop = body.scrollHeight;
@@ -5692,7 +6454,18 @@
                             localPlaceholder = false;
                             statusText = '正在想这道题';
                             updateHeader();
+                            setExpanded(true);
                             renderStream();
+                        }
+                        if (event.type === 'done' && event.thinking) {
+                            rawThinking = String(event.thinking);
+                            const native = sanitizeThinkingTranscript(rawThinking, false);
+                            if (native) {
+                                hasNativeThinking = true;
+                                localPlaceholder = false;
+                                setExpanded(true);
+                                renderStream();
+                            }
                         }
                     },
                     startLocalStages,
@@ -5724,7 +6497,7 @@
                         }
                         updateHeader();
                         renderStream();
-                        setExpanded(false);
+                        setExpanded(Boolean(visibleThinkingText()));
                     },
                     snapshot() {
                         return {
@@ -5760,6 +6533,7 @@
                                 <span class="chat-thinking-dots" aria-hidden="true"><span></span><span></span><span></span></span>
                                 <i class="fa-solid fa-chevron-down chat-thinking-chevron" aria-hidden="true"></i>
                             </button>
+                            <div class="chat-thinking-preview"></div>
                             <div class="chat-thinking-body" aria-live="polite">
                                 <div class="chat-thinking-stream"></div>
                             </div>
@@ -5789,10 +6563,15 @@
                     event.preventDefault();
                     const messageEl = knowledgeBtn.closest('.message-animate');
                     const content = (messageEl && messageEl.dataset.aiContent) || '';
-                    const structured = parseStructuredReply(content);
-                    const items = getKnowledgeMethodologyLines(structured);
+                    const items = getSaveableKnowledgeLines(content, parseStructuredReply(content));
                     const itemIndex = Number(knowledgeBtn.dataset.knowledgeIndex);
-                    const itemText = Number.isFinite(itemIndex) ? (items[itemIndex] || '') : '';
+                    const fromDom = knowledgeBtn.closest('.chat-knowledge-item');
+                    const fromDomText = fromDom && fromDom.querySelector('.chat-knowledge-text')
+                        ? String(fromDom.querySelector('.chat-knowledge-text').textContent || '').trim()
+                        : '';
+                    const itemText = Number.isFinite(itemIndex) && items[itemIndex]
+                        ? items[itemIndex]
+                        : fromDomText;
                     const note = saveKnowledgeMethodologyFromMessage(messageEl, {
                         itemText,
                         button: knowledgeBtn
@@ -5818,7 +6597,7 @@
                         if (result.createdCount > 0 && result.skippedCount > 0) {
                             showToast(`新存入 ${result.createdCount} 条，跳过重复 ${result.skippedCount} 条`);
                         } else if (result.createdCount > 0) {
-                            showToast(`已存入 ${result.createdCount} 条知识点`);
+                            showToast(`已存入 ${result.createdCount} 条教学要点`);
                         } else {
                             showToast('这些原文已在笔记中，未重复保存');
                         }
@@ -5833,6 +6612,9 @@
                 event.preventDefault();
                 const collapsed = panel.classList.toggle('is-collapsed');
                 toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                if (!collapsed) {
+                    scrollChatToElement(panel);
+                }
             });
 
             function appendMessage(content, sender, options = {}) {
@@ -5865,16 +6647,7 @@
                     } else {
                         const aiBubbleClass = aiRender && aiRender.isStructured ? 'chat-text' : 'chat-text chat-markdown';
                         const thinkingHtml = renderThinkingPanelHtml(options.thinkingSnapshot, { finished: true, collapsed: true });
-                        const canSaveKnowledge = type === 'text'
-                            && aiRender
-                            && aiRender.structured
-                            && getKnowledgeMethodologyLines(aiRender.structured).length > 0;
-                        const actionsHtml = canSaveKnowledge
-                            ? ''
-                            : (type === 'text' && String(content || '').trim()
-                                ? `<div class="chat-reply-actions"><span class="chat-save-note-hint">讲题后会显示「知识点与方法论」，可一键存入笔记</span></div>`
-                                : '');
-                        div.innerHTML = `<span class="chat-meta-line ml-0.5">陶然 · ${time}</span><div class="chat-bubble-ai">${thinkingHtml}<div class="chat-ai-reply-body ${aiBubbleClass}">${renderedContent}</div>${actionsHtml}</div>`;
+                        div.innerHTML = `<span class="chat-meta-line ml-0.5">陶然 · ${time}</span><div class="chat-bubble-ai">${thinkingHtml}<div class="chat-ai-reply-body ${aiBubbleClass}">${renderedContent}</div></div>`;
                         if (type === 'text' && String(content || '').trim()) {
                             div.dataset.aiContent = content;
                         }
@@ -5942,45 +6715,119 @@
                 };
             }
 
-            async function renderHistoryList() {
-                closeHistoryMenu();
-                const chats = await getAllChats();
-                historyList.innerHTML = '';
-                historyCount.textContent = `${chats.length} 条对话`;
-                historyEmpty.style.display = chats.length ? 'none' : 'flex';
-                chats.forEach(chat => {
-                    const item = document.createElement('div');
-                    const lastMessage = chat.messages[chat.messages.length - 1];
-                    const preview = getMessagePreview(lastMessage).slice(0, 42);
-                    item.className = `history-item rounded-[18px] border border-gray-200 p-3 cursor-pointer ${chat.id === currentChatId ? 'active' : 'bg-white'}`;
-                    item.dataset.historyId = chat.id;
-                    item.innerHTML = `
+            let pinnedSectionOpen = localStorage.getItem(PINNED_SECTION_KEY) !== '0';
+
+            function setPinnedSectionOpen(open) {
+                pinnedSectionOpen = Boolean(open);
+                localStorage.setItem(PINNED_SECTION_KEY, pinnedSectionOpen ? '1' : '0');
+            }
+
+            function createHistoryItem(chat, options = {}) {
+                const compact = Boolean(options.compact);
+                const item = document.createElement('div');
+                const messages = Array.isArray(chat.messages) ? chat.messages : [];
+                const lastMessage = messages[messages.length - 1];
+                const preview = getMessagePreview(lastMessage).slice(0, 42);
+                item.className = `history-item cursor-pointer ${compact ? 'is-pinned' : `rounded-[18px] border border-gray-200 p-3 ${chat.id === currentChatId ? 'active' : 'bg-white'}`}${compact && chat.id === currentChatId ? ' active' : ''}`;
+                item.dataset.historyId = chat.id;
+                item.innerHTML = compact
+                    ? `
+                        <div class="flex items-center gap-2">
+                            <p class="history-item-title text-sm font-semibold text-gray-800 truncate flex-1 min-w-0">${escapeHtml(chat.title)}</p>
+                            <button type="button" class="history-more-btn" data-chat-id="${chat.id}" title="更多" aria-label="更多">
+                                <i class="fa-solid fa-ellipsis"></i>
+                            </button>
+                        </div>
+                    `
+                    : `
                         <div class="flex items-start gap-3">
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center justify-between gap-3">
-                                    <p class="history-item-title text-sm font-semibold text-gray-800 truncate">${chat.pinned ? '<i class="fa-solid fa-thumbtack history-pin-mark"></i>' : ''}${escapeHtml(chat.title)}</p>
+                                    <p class="history-item-title text-sm font-semibold text-gray-800 truncate">${escapeHtml(chat.title)}</p>
                                     <span class="text-[11px] text-gray-400 whitespace-nowrap">${formatChatTime(chat.updatedAt)}</span>
                                 </div>
                                 <p class="text-xs text-gray-500 mt-1">${escapeHtml(preview)}</p>
-                                <p class="text-[11px] text-gray-400 mt-2">${chat.messages.length} 条消息</p>
+                                <p class="text-[11px] text-gray-400 mt-2">${messages.length} 条消息</p>
                             </div>
                             <button type="button" class="history-more-btn" data-chat-id="${chat.id}" title="更多" aria-label="更多">
                                 <i class="fa-solid fa-ellipsis"></i>
                             </button>
                         </div>
                     `;
-                    item.addEventListener('click', async function(event) {
-                        if (event.target.closest('.history-more-btn, .history-rename-input')) return;
-                        closeHistoryMenu();
-                        await loadChat(chat.id);
-                        closeHistoryPanel();
-                    });
-                    item.querySelector('.history-more-btn').addEventListener('click', function(event) {
-                        event.stopPropagation();
-                        openHistoryMenu(event.currentTarget, chat);
-                    });
-                    historyList.appendChild(item);
+                item.addEventListener('click', async function(event) {
+                    if (event.target.closest('.history-more-btn, .history-rename-input')) return;
+                    closeHistoryMenu();
+                    await loadChat(chat.id);
+                    closeHistoryPanel();
                 });
+                item.querySelector('.history-more-btn').addEventListener('click', function(event) {
+                    event.stopPropagation();
+                    openHistoryMenu(event.currentTarget, chat);
+                });
+                return item;
+            }
+
+            function syncPinnedSectionHeader(group, count) {
+                const label = group.querySelector('.history-pin-toggle-label');
+                const chevron = group.querySelector('.history-pin-chevron');
+                const toggle = group.querySelector('.history-pin-toggle');
+                if (label) label.textContent = pinnedSectionOpen ? '置顶' : `置顶 ${count} 个对话`;
+                if (chevron) {
+                    chevron.classList.toggle('fa-chevron-up', pinnedSectionOpen);
+                    chevron.classList.toggle('fa-chevron-down', !pinnedSectionOpen);
+                }
+                if (toggle) {
+                    toggle.setAttribute('aria-expanded', pinnedSectionOpen ? 'true' : 'false');
+                    toggle.setAttribute('aria-label', pinnedSectionOpen ? '收起置顶对话' : `展开置顶的 ${count} 个对话`);
+                }
+                group.classList.toggle('is-collapsed', !pinnedSectionOpen);
+            }
+
+            async function renderHistoryList() {
+                closeHistoryMenu();
+                const chats = await getAllChats();
+                const pinnedChats = chats.filter(chat => chat.pinned);
+                const recentChats = chats.filter(chat => !chat.pinned);
+                historyList.innerHTML = '';
+                historyCount.textContent = `${chats.length} 条对话`;
+                historyEmpty.style.display = chats.length ? 'none' : 'flex';
+
+                if (pinnedChats.length) {
+                    const group = document.createElement('div');
+                    group.className = 'history-pin-group';
+                    group.innerHTML = `
+                        <button type="button" class="history-pin-toggle" aria-expanded="true">
+                            <span class="history-pin-toggle-left">
+                                <span class="history-pin-toggle-label">置顶</span>
+                                <i class="fa-solid fa-chevron-up history-pin-chevron"></i>
+                            </span>
+                        </button>
+                    `;
+                    const items = document.createElement('div');
+                    items.className = 'history-pin-items';
+                    pinnedChats.forEach(chat => items.appendChild(createHistoryItem(chat, { compact: true })));
+                    group.appendChild(items);
+                    group.querySelector('.history-pin-toggle').addEventListener('click', function(event) {
+                        event.stopPropagation();
+                        setPinnedSectionOpen(!pinnedSectionOpen);
+                        syncPinnedSectionHeader(group, pinnedChats.length);
+                    });
+                    syncPinnedSectionHeader(group, pinnedChats.length);
+                    historyList.appendChild(group);
+                }
+
+                if (recentChats.length) {
+                    const recent = document.createElement('div');
+                    recent.className = 'history-recent-list';
+                    if (pinnedChats.length) {
+                        const label = document.createElement('p');
+                        label.className = 'history-recent-label';
+                        label.textContent = '最近对话';
+                        recent.appendChild(label);
+                    }
+                    recentChats.forEach(chat => recent.appendChild(createHistoryItem(chat)));
+                    historyList.appendChild(recent);
+                }
             }
 
             function closeHistoryMenu() {
@@ -6142,7 +6989,17 @@
             function loadGeneratedFlashcards() {
                 try {
                     const parsed = JSON.parse(localStorage.getItem(GENERATED_FLASHCARDS_KEY) || '[]');
-                    return Array.isArray(parsed) ? parsed.filter(item => item && item.id && item.title) : [];
+                    if (!Array.isArray(parsed)) return [];
+                    const sanitized = parsed
+                        .filter(item => item && item.id && item.title)
+                        .map(item => sanitizeGeneratedFlashcard(item))
+                        .filter(item => item && !shouldDropGeneratedFlashcard(item));
+                    try {
+                        localStorage.setItem(GENERATED_FLASHCARDS_KEY, JSON.stringify(sanitized));
+                    } catch (error) {
+                        // 忽略本地存储异常
+                    }
+                    return sanitized;
                 } catch (error) {
                     return [];
                 }
@@ -6588,7 +7445,7 @@
 
                 const questionType = sanitizeStructuredMeta(meta.questionType || '').trim() || '讲题';
                 const subtype = sanitizeStructuredMeta(meta.subtype || '').trim();
-                const cleanedQuestion = cleanTitleText(meta.sourceQuestion || '').replace(/\s+/g, ' ').trim();
+                const cleanedQuestion = resolveFlashcardSourceQuestion(meta.sourceQuestion || '');
                 const title = trimTitleLength(rawContent.split(/[，。；：]/)[0], 22)
                     || summarizeQuestionTitle(cleanedQuestion, meta.structured || null, 22)
                     || `${questionType}${subtype ? ` · ${subtype}` : ''}`
@@ -6623,8 +7480,8 @@
                     methodologyItems = [singleItem];
                 } else if (explicitItems.length) {
                     methodologyItems = explicitItems;
-                } else if (structured) {
-                    methodologyItems = getKnowledgeMethodologyLines(structured);
+                } else {
+                    methodologyItems = getSaveableKnowledgeLines(content, structured);
                 }
 
                 const unique = [];
@@ -6664,7 +7521,7 @@
                 const content = messageEl.dataset.aiContent || '';
                 if (!content) return;
                 const structured = parseStructuredReply(content);
-                const items = getKnowledgeMethodologyLines(structured);
+                const items = getSaveableKnowledgeLines(content, structured);
                 if (!items.length) return;
                 messageEl.querySelectorAll('[data-save-knowledge-item]').forEach(button => {
                     const index = Number(button.dataset.knowledgeIndex);
@@ -6754,7 +7611,7 @@
                         const bubble = previous.querySelector('.chat-bubble-user, .chat-image-bubble');
                         if (!bubble) return '';
                         const caption = bubble.querySelector('p');
-                        return (caption ? caption.textContent : bubble.textContent || '').trim();
+                        return resolveFlashcardSourceQuestion(caption ? caption.textContent : '');
                     }
                     previous = previous.previousElementSibling;
                 }
@@ -6868,53 +7725,120 @@
                 return Math.abs(hash).toString(36);
             }
 
-            function buildGeneratedFlashcardFromStructuredReply(data, sourceQuestion = '') {
+            function buildGeneratedFlashcardFromStructuredReply(data, sourceQuestion = '', ocrText = '') {
                 if (!data || !data.supported) return null;
+                if (isIncompleteTeachingCard(data)) return null;
                 const explanationLines = getStructuredExplanationLines(data, 4);
                 const answerLines = getStructuredAnswerLines(data);
-                if (!explanationLines.length && !answerLines.length) return null;
+                const methodLines = getKnowledgeMethodologyLines(data);
+                if (!explanationLines.length && !answerLines.length && !methodLines.length) return null;
 
-                const cleanedQuestion = cleanTitleText(sourceQuestion).replace(/\s+/g, ' ').trim();
-                const subtype = sanitizeStructuredMeta(data.subtype || '').trim();
-                const questionType = sanitizeStructuredMeta(data.questionType || '').trim() || '讲题';
-                const questionFocusedTitle = summarizeQuestionTitle(cleanedQuestion, data, 22);
-                const title = questionFocusedTitle || summarizeStructuredQuestionFocus(data) || `${questionType}${subtype ? ` · ${subtype}` : ''}`;
-                const frontQuestion = cleanedQuestion || summarizeStructuredQuestionFocus(data) || `${questionType}${subtype ? `：${subtype}` : ''}`;
-                const bullets = (data.knowledgeCards && data.knowledgeCards.length ? data.knowledgeCards : explanationLines)
+                const title = buildTopicTitle('flashcard', sourceQuestion, data, ocrText);
+                if (!title || isWeakTopicTitle(title)) return null;
+
+                const ctx = collectTitleContext(sourceQuestion, data, ocrText);
+                const cleanedQuestion = resolveFlashcardSourceQuestion(sourceQuestion);
+                const questionType = ctx.questionType || '讲题';
+                const subtype = ctx.subtype;
+                const readingLike = isReadingLikeType(questionType);
+                let answer = '';
+                if (readingLike) {
+                    answer = methodLines[0] || ctx.statement || '回原文定位，再核对同义改写。';
+                } else if (answerLines.length && methodLines[0]) {
+                    const shortAnswer = answerLines.slice(0, 2).join('；');
+                    answer = shortAnswer.length <= 36 ? `${shortAnswer}。${methodLines[0]}` : methodLines[0];
+                } else {
+                    answer = answerLines.join('；') || methodLines[0] || explanationLines[0] || ctx.statement;
+                }
+                if (!answer || /^需要确认$/.test(String(answer).trim())) return null;
+
+                const bullets = (methodLines.length ? methodLines : (data.knowledgeCards && data.knowledgeCards.length ? data.knowledgeCards : explanationLines))
                     .map(item => String(item || '').trim())
                     .filter(Boolean)
                     .slice(0, 4);
                 const tags = Array.from(new Set([questionType, subtype, ...(data.knowledgeCards || [])].map(item => String(item || '').trim()).filter(Boolean))).slice(0, 5);
-                const summary = data.stemUnderstanding || explanationLines[0] || `${questionType}复盘卡`;
-                const answer = answerLines.join('；') || '需要确认';
-                const tip = data.followUp || '你可以再回到原句里代入一遍，看看这个判断是不是还能成立。';
-                const id = `generated-${buildFlashcardHash(`${frontQuestion}|${answer}`)}`;
+                const rawSummary = methodLines[0] || ctx.statement || data.stemUnderstanding || `${questionType}复盘卡`;
+                const summary = (isStorySpecificText(rawSummary) || isPassageDump(rawSummary) || isWeakTopicTitle(rawSummary))
+                    ? (ctx.statement || title)
+                    : rawSummary;
+                const topicKey = buildFlashcardTopicKey(data, sourceQuestion, ocrText);
+                const id = `generated-${buildFlashcardHash(topicKey)}`;
+                const prompt = (cleanedQuestion && extractUserChallenge(cleanedQuestion))
+                    ? cleanedQuestion
+                    : `继续帮我讲：${title}`;
 
                 return {
                     id,
+                    topicKey,
                     generated: true,
                     title,
                     category: questionType,
-                    frontQuestion,
-                    frontHint: explanationLines[0] || '先回看题干，再自己试着判断一遍。',
+                    frontQuestion: title,
+                    frontHint: explanationLines[0] || methodLines[0] || '先回看判断规则，再自己试一遍。',
                     answer,
                     bullets,
                     tags,
                     summary,
-                    tip,
-                    prompt: cleanedQuestion || `继续帮我讲一下${title}`,
+                    tip: data.followUp || '回到原句代入一遍，看这个判断还能不能成立。',
+                    prompt,
                     createdAt: new Date().toISOString()
                 };
             }
 
-            function upsertGeneratedFlashcardFromStructuredReply(content, sourceQuestion = '') {
+            function shouldDropGeneratedFlashcard(card) {
+                if (!card) return true;
+                const blob = [card.frontQuestion, card.frontHint, card.summary, card.answer, card.title, card.tip].join('\n');
+                if (isMissingQuestionMaterial(blob)) return true;
+                if (/先补材料|只有题型、没有题目|没法判断空格|还没有原文、题干|没法讲具体哪一题/.test(blob)) return true;
+                if (/需要确认/.test(card.answer || '') && /先补|没有题目|没法讲|需要补充/.test(blob)) return true;
+                return false;
+            }
+
+            function sanitizeGeneratedFlashcard(card) {
+                if (!card || !card.id) return null;
+                if (shouldDropGeneratedFlashcard(card)) return null;
+                const titleJunk = isWeakTopicTitle(card.title) || isImageFileNameSource(card.title);
+                const frontJunk = isWeakTopicTitle(card.frontQuestion)
+                    || isJunkFlashcardSource(card.frontQuestion)
+                    || isStorySpecificText(card.frontQuestion)
+                    || isPassageDump(card.frontQuestion)
+                    || /最容易错在哪/.test(card.frontQuestion || '');
+                const promptJunk = isJunkFlashcardSource(card.prompt) || isImageFileNameSource(card.prompt) || isStorySpecificText(card.prompt) || isPassageDump(card.prompt);
+                if (!titleJunk && !frontJunk && !promptJunk) return card;
+
+                const rebuilt = buildGeneratedFlashcardFromStructuredReply({
+                    supported: true,
+                    questionType: card.category || '讲题',
+                    subtype: (card.tags || []).find(tag => tag && tag !== card.category) || '',
+                    stemUnderstanding: card.summary || '',
+                    answer: card.answer || '',
+                    followUp: card.tip || '',
+                    knowledgeCards: card.tags || [],
+                    knowledgeMethodology: card.bullets || [],
+                    reasoningSteps: card.frontHint ? [{ step: 1, focus: '', basis: card.frontHint, conclusion: '' }] : []
+                }, titleJunk ? '' : (card.title || card.frontQuestion || ''), card.summary || '');
+
+                if (!rebuilt || isWeakTopicTitle(rebuilt.title)) return titleJunk ? null : card;
+                return {
+                    ...card,
+                    title: titleJunk ? rebuilt.title : card.title,
+                    frontQuestion: frontJunk ? rebuilt.frontQuestion : card.frontQuestion,
+                    prompt: promptJunk ? rebuilt.prompt : card.prompt,
+                    topicKey: rebuilt.topicKey || card.topicKey
+                };
+            }
+
+            function upsertGeneratedFlashcardFromStructuredReply(content, sourceQuestion = '', ocrText = '', options = {}) {
                 const structured = parseStructuredReply(content);
-                const card = buildGeneratedFlashcardFromStructuredReply(structured, sourceQuestion);
+                if (!options.explicit && !shouldAutoCreateFlashcard(structured, sourceQuestion, ocrText)) return null;
+                const card = buildGeneratedFlashcardFromStructuredReply(structured, sourceQuestion, ocrText);
                 if (!card) return null;
 
-                const existingIndex = generatedFlashcards.findIndex(item => item.id === card.id);
+                const existingIndex = generatedFlashcards.findIndex(item => (
+                    item.id === card.id || (item.topicKey && card.topicKey && item.topicKey === card.topicKey)
+                ));
                 if (existingIndex >= 0) {
-                    generatedFlashcards.splice(existingIndex, 1, card);
+                    generatedFlashcards.splice(existingIndex, 1, { ...generatedFlashcards[existingIndex], ...card });
                 } else {
                     generatedFlashcards.unshift(card);
                 }
@@ -6940,7 +7864,7 @@
                     for (let j = index - 1; j >= 0; j -= 1) {
                         const previous = messages[j];
                         if (!previous || previous.sender !== 'user') continue;
-                        sourceQuestion = previous.content || previous.fileName || '';
+                        sourceQuestion = resolveFlashcardSourceQuestion(previous.content || '');
                         break;
                     }
 
@@ -6965,7 +7889,7 @@
                         const previous = messages[j];
                         if (!previous || previous.sender !== 'user') continue;
                         if (isNoteSaveRequest(previous.content) || isFlashcardSaveRequest(previous.content)) continue;
-                        sourceQuestion = previous.content || previous.fileName || '';
+                        sourceQuestion = resolveFlashcardSourceQuestion(previous.content || '');
                         break;
                     }
 
@@ -7274,8 +8198,11 @@
 
             function isBlankFollowup(text) {
                 const source = String(text || '').trim();
-                if (!source || source.length > 16) return false;
-                return /^(?:那|然后|接着|还有|再看|继续|再讲|那再看|那再讲)?\s*(?:第\s*)?[（(]?\s*\d{1,3}\s*[)）]?\s*(?:空|题|小题)?\s*[。.?？!！～~]*$/.test(source);
+                if (!source || source.length > 24) return false;
+                if (/^(?:那|然后|接着|还有|再看|继续|再讲|那再看|那再讲)?\s*(?:第\s*)?[（(]?\s*\d{1,3}\s*[)）]?\s*(?:空|题|小题)?\s*[。.?？!！～~]*$/.test(source)) {
+                    return true;
+                }
+                return /^(?:可以|请|帮我|麻烦)?(?:详细)?(?:给)?(?:我)?(?:讲|讲解|分析|看看|看下)(?:一下)?\s*(?:第\s*)?\d{1,3}\s*(?:空|题|小题)?[吗么嘛]?[。.?？!！～~]*$/.test(source);
             }
 
             async function getLastChatImagePayload() {
@@ -7328,6 +8255,9 @@
                 let buffer = '';
                 let reply = '';
                 let contentText = '';
+                let ocrText = '';
+                let ocrStem = '';
+                let thinkingText = '';
 
                 const consumeBlock = (part) => {
                     const dataLine = part
@@ -7346,8 +8276,16 @@
                         contentText += payload.text;
                         payload = { ...payload, fullText: contentText };
                     }
+                    if (payload.type === 'ocr' && payload.text) {
+                        ocrText = payload.text;
+                    }
                     if (payload.type === 'done' && payload.reply) {
                         reply = payload.reply;
+                        if (payload.ocr_text) ocrText = payload.ocr_text;
+                        if (payload.ocr_stem) ocrStem = payload.ocr_stem;
+                    }
+                    if (payload.type === 'done' && payload.thinking) {
+                        thinkingText = String(payload.thinking);
                     }
                     if (payload.type === 'error' && payload.message) {
                         throw new Error(payload.message);
@@ -7364,8 +8302,8 @@
                     parts.forEach(consumeBlock);
                 }
                 if (buffer.trim()) consumeBlock(buffer.trim());
-                if (reply) return reply;
-                if (contentText) return contentText;
+                if (reply) return { reply, ocrText, ocrStem, thinking: thinkingText };
+                if (contentText) return { reply: contentText, ocrText, ocrStem, thinking: thinkingText };
                 throw new Error('empty stream');
             }
 
@@ -7381,7 +8319,12 @@
                     throw new Error(`request failed: ${response.status}`);
                 }
                 const data = await response.json();
-                return data.reply;
+                return {
+                    reply: data.reply,
+                    ocrText: data.ocr_text || '',
+                    ocrStem: data.ocr_stem || '',
+                    thinking: data.thinking || ''
+                };
             }
 
             async function requestAssistantReply(messageText, imagePayload = null, onEvent = null) {
@@ -7410,7 +8353,12 @@
                     const contentType = String(response.headers.get('content-type') || '');
                     if (contentType.includes('application/json') && !contentType.includes('text/event-stream')) {
                         const data = await response.json();
-                        return data.reply;
+                        return {
+                            reply: data.reply,
+                            ocrText: data.ocr_text || '',
+                            ocrStem: data.ocr_stem || '',
+                            thinking: data.thinking || ''
+                        };
                     }
                     return await consumeSseResponse(response, onEvent);
                 } catch (error) {
@@ -7567,7 +8515,9 @@
                             } else {
                                 const generatedCard = upsertGeneratedFlashcardFromStructuredReply(
                                     latestContext.aiMessage.content,
-                                    latestContext.sourceQuestion || ''
+                                    latestContext.sourceQuestion || '',
+                                    '',
+                                    { explicit: true }
                                 );
                                 if (generatedCard) {
                                     setSelectedNote(generatedCard.id);
@@ -7601,19 +8551,27 @@
                 try {
                     const currentImage = pendingImage;
                     clearPendingImage();
-                    const replyText = await requestAssistantReply(text, currentImage, (event) => {
+                    const assistant = await requestAssistantReply(text, currentImage, (event) => {
                         if (thinkingIndicator._thinkingController) {
                             thinkingIndicator._thinkingController.handleEvent(event);
                         }
                     });
+                    const replyText = assistant && assistant.reply ? assistant.reply : '';
+                    const ocrText = assistant && (assistant.ocrText || assistant.ocrStem) ? (assistant.ocrText || assistant.ocrStem) : '';
                     const controller = thinkingIndicator._thinkingController;
                     if (controller) {
                         controller.ingestFinalReply(replyText);
                         controller.finish();
                     }
-                    const thinkingSnapshot = controller ? controller.snapshot() : null;
+                    let thinkingSnapshot = controller ? controller.snapshot() : null;
+                    if (!snapshotToThinkingText(thinkingSnapshot) && assistant && assistant.thinking) {
+                        thinkingSnapshot = {
+                            durationMs: (thinkingSnapshot && thinkingSnapshot.durationMs) || (Date.now() - thinkingStartedAt),
+                            streamText: assistant.thinking
+                        };
+                    }
                     await ensureMinimumThinkingTime(thinkingStartedAt, 600);
-                    const generatedCard = upsertGeneratedFlashcardFromStructuredReply(replyText, text || (currentImage && currentImage.name) || '');
+                    const generatedCard = upsertGeneratedFlashcardFromStructuredReply(replyText, text, ocrText);
                     if (generatedCard) {
                         setSelectedNote(generatedCard.id);
                     }

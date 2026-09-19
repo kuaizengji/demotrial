@@ -68,6 +68,8 @@ class ModelMeta(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     meta: ModelMeta
+    ocr_text: str | None = None
+    ocr_stem: str | None = None
 
 
 class ModelSettings(BaseModel):
@@ -381,6 +383,64 @@ def asked_for_knowledge_cards(message: str) -> bool:
     return bool(re.search(r"闪卡|错题卡|知识点卡片|整理关键词|做成卡片|做成闪卡", message or ""))
 
 
+_QUESTION_STEM_START = re.compile(
+    r"(?i)^(?:(?:第\s*)?\d+\s*[.．、)）]\s+|"
+    r"which of the following|according to|"
+    r"why (?:did|does|is|was|would|do)|"
+    r"what (?:does|did|is|can|do|would)|"
+    r"the (?:passage|author|text|best title)|"
+    r"it can be inferred|the main idea)"
+)
+
+
+def preferred_question_number(message: str) -> str:
+    match = re.search(r"第\s*(\d+)\s*[题空]", message or "")
+    return match.group(1) if match else ""
+
+
+def clip_question_stem(text: str, limit: int = 72) -> str:
+    cleaned = re.sub(r"\s+", " ", text or "").strip()
+    if not cleaned:
+        return ""
+    return cleaned if len(cleaned) <= limit else f"{cleaned[: limit - 1]}…"
+
+
+def extract_question_stem(ocr_text: str, message: str = "") -> str:
+    source = (ocr_text or "").replace("\r", "")
+    if not source.strip():
+        return ""
+
+    preferred = preferred_question_number(message)
+    numbered: list[tuple[str, str]] = []
+    question_like: list[str] = []
+    for raw_line in re.split(r"\n+", source):
+        line = raw_line.strip()
+        if not line:
+            continue
+        numbered_match = re.match(r"^(?:第\s*)?(\d+)\s*[.．、)）]\s+(.+)$", line)
+        if numbered_match:
+            numbered.append((numbered_match.group(1), line))
+        if _QUESTION_STEM_START.search(line):
+            question_like.append(line)
+
+    if preferred:
+        for number, line in numbered:
+            if number == preferred:
+                return clip_question_stem(line)
+    if question_like:
+        return clip_question_stem(question_like[0])
+    if numbered:
+        return clip_question_stem(numbered[0][1])
+
+    marked = re.search(r"((?:第\s*)?\d+\s*[.．、)）]\s+[^\n]{8,90})", source)
+    if marked:
+        return clip_question_stem(marked.group(1))
+    asked = re.search(r"([A-Z][^?\n]{12,80}\?)", source)
+    if asked:
+        return clip_question_stem(asked.group(1))
+    return ""
+
+
 def is_hollow_structured(parsed: dict[str, object]) -> bool:
     answer = str(parsed.get("answer") or "").strip()
     stem = str(parsed.get("stem_understanding") or "").strip()
@@ -631,7 +691,7 @@ def sanitize_thinking_text(text: str, live: bool = False) -> str:
                 continue
             if THINKING_NOISE_RE.search(item) or re.match(r"^\s*[{[]", item) or re.match(r'^"[a-z_]+"\s*:', item):
                 continue
-            if re.search(r"JSON|字段名|输出格式|schema", item, flags=re.IGNORECASE):
+            if re.search(r"JSON|字段名|输出格式|schema|知识卡片|输出要求", item, flags=re.IGNORECASE):
                 continue
             kept.append(item)
         if kept:
@@ -648,19 +708,57 @@ def sanitize_thinking_text(text: str, live: bool = False) -> str:
     return re.sub(r"\n{3,}", "\n\n", "\n\n".join(cleaned)).strip()
 
 
+def thinking_from_structured_reply(reply: str) -> str:
+    parsed = parse_structured_reply(reply)
+    if not parsed:
+        return ""
+    parts: list[str] = []
+    stem = str(parsed.get("stem_understanding") or "").strip()
+    if stem:
+        parts.append(stem)
+    steps = parsed.get("reasoning_steps")
+    if isinstance(steps, list):
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            focus = str(step.get("focus") or "").strip()
+            basis = str(step.get("basis") or "").strip()
+            conclusion = str(step.get("conclusion") or "").strip()
+            if re.match(r"^(判断题型|调用方法|本题考查|这是一道)", focus):
+                focus = ""
+            pieces = []
+            if focus:
+                pieces.append(f"{focus}：")
+            if basis:
+                pieces.append(basis if basis.endswith("。") else f"{basis}。")
+            if conclusion and conclusion != basis:
+                pieces.append(conclusion if conclusion.endswith("。") else f"{conclusion}。")
+            sentence = " ".join(pieces).strip()
+            if sentence:
+                parts.append(sentence)
+    return sanitize_thinking_text("\n\n".join(parts))
+
+
 BLANK_FOLLOWUP_RE = re.compile(
     r"^\s*(那|然后|接着|还有|再看|继续|再讲|那再看|那再讲)?"
     r"\s*(第\s*)?[（(]?\s*\d{1,3}\s*[)）]?\s*(空|题|小题)?"
     r"\s*[。.?？!！～~]*\s*$",
     re.IGNORECASE,
 )
+ASK_BLANK_FOLLOWUP_RE = re.compile(
+    r"^(?:可以|请|帮我|麻烦)?(?:详细)?(?:给)?(?:我)?"
+    r"(?:讲|讲解|分析|看看|看下)(?:一下)?"
+    r"\s*(?:第\s*)?\d{1,3}\s*(?:空|题|小题)?[吗么嘛]?"
+    r"[。.?？!！～~]*$",
+    re.IGNORECASE,
+)
 
 
 def is_blank_followup(message: str) -> bool:
     text = (message or "").strip()
-    if not text or len(text) > 16:
+    if not text or len(text) > 24:
         return False
-    return bool(BLANK_FOLLOWUP_RE.match(text))
+    return bool(BLANK_FOLLOWUP_RE.match(text) or ASK_BLANK_FOLLOWUP_RE.match(text))
 
 
 def is_greeting_history_item(item: ChatMessage) -> bool:
@@ -839,7 +937,7 @@ def sse_event(payload: dict[str, object]) -> str:
 
 def model_supports_thinking(model: str) -> bool:
     name = (model or "").lower()
-    return any(token in name for token in ("qwen3", "qwen-plus", "qwen-flash", "qwen-turbo", "qwq"))
+    return any(token in name for token in ("qwen3", "qwen-plus", "qwen-flash", "qwen-turbo", "qwq", "qwen-vl-plus", "qwen-vl-max"))
 
 
 def extract_stream_delta_text(delta: object) -> tuple[str, str]:
@@ -908,26 +1006,45 @@ def iter_streamed_reply_events(
     content_parts: list[str] = []
     raw_thinking = ""
     emitted_thinking = ""
-    for reasoning, content in iter_completion_deltas(
-        client,
-        model=model,
-        messages=messages,
-        temperature=temperature,
-        enable_thinking=enable_thinking,
-    ):
-        if reasoning:
-            raw_thinking += reasoning
-            cleaned = sanitize_thinking_text(raw_thinking, live=True)
-            if cleaned.startswith(emitted_thinking):
-                delta = cleaned[len(emitted_thinking) :]
-            else:
-                delta = ""
-            if delta:
-                emitted_thinking = cleaned
-                yield sse_event({"type": "thinking", "text": delta})
-        if content:
-            content_parts.append(content)
-            yield sse_event({"type": "content", "text": content})
+    try:
+        deltas = iter_completion_deltas(
+            client,
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            enable_thinking=enable_thinking,
+        )
+        for reasoning, content in deltas:
+            if reasoning:
+                raw_thinking += reasoning
+                cleaned = sanitize_thinking_text(raw_thinking, live=True)
+                if cleaned.startswith(emitted_thinking):
+                    delta = cleaned[len(emitted_thinking) :]
+                else:
+                    delta = cleaned if not emitted_thinking else ""
+                if delta:
+                    emitted_thinking = cleaned
+                    yield sse_event({"type": "thinking", "text": delta})
+            if content:
+                content_parts.append(content)
+                yield sse_event({"type": "content", "text": content})
+    except Exception:
+        if not enable_thinking:
+            raise
+        logger.exception("Thinking-enabled stream failed, retrying without thinking")
+        content_parts = []
+        raw_thinking = ""
+        emitted_thinking = ""
+        for reasoning, content in iter_completion_deltas(
+            client,
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            enable_thinking=False,
+        ):
+            if content:
+                content_parts.append(content)
+                yield sse_event({"type": "content", "text": content})
 
     reply = "".join(content_parts)
     if not reply.strip():
@@ -937,7 +1054,18 @@ def iter_streamed_reply_events(
             yield sse_event({"type": "content", "text": reply})
 
     reply = normalize_structured_reply(reply, message=source_message, image_context=image_context)
-    yield sse_event({"type": "done", "reply": reply, "meta": meta.model_dump()})
+    final_thinking = emitted_thinking or sanitize_thinking_text(raw_thinking)
+    if not final_thinking:
+        final_thinking = thinking_from_structured_reply(reply)
+    done_payload: dict[str, object] = {"type": "done", "reply": reply, "meta": meta.model_dump()}
+    if final_thinking:
+        done_payload["thinking"] = final_thinking
+    if image_context:
+        done_payload["ocr_text"] = image_context
+        stem = extract_question_stem(image_context, source_message)
+        if stem:
+            done_payload["ocr_stem"] = stem
+    yield sse_event(done_payload)
 
 
 def iter_chat_sse(request: ChatRequest):
@@ -972,6 +1100,8 @@ def iter_chat_sse(request: ChatRequest):
                 route = "ocr_plus_vision"
                 yield sse_event({"type": "status", "stage": "ocr", "text": "先把图片里的字认出来"})
                 ocr_text = extract_ocr_text(client, request.latest_image, ocr_model)
+                if ocr_text:
+                    yield sse_event({"type": "ocr", "text": ocr_text})
             yield sse_event({"type": "status", "stage": "analyze", "text": "先把图里的题目看清楚"})
             meta = ModelMeta(
                 route=route,
@@ -989,7 +1119,7 @@ def iter_chat_sse(request: ChatRequest):
                     ocr_text=ocr_text,
                 ),
                 temperature=0.7,
-                enable_thinking=False,
+                enable_thinking=model_supports_thinking(vision_model),
                 meta=meta,
                 non_stream_fallback=lambda: generate_vision_reply(
                     client,
@@ -1075,6 +1205,8 @@ def run_model_pipeline(request: ChatRequest) -> ChatResponse:
                     vision_model=vision_model,
                     ocr_model=ocr_model if route == "ocr_plus_vision" else None,
                 ),
+                ocr_text=ocr_text,
+                ocr_stem=extract_question_stem(ocr_text or "", request.message) or None,
             )
 
         reply = generate_text_reply(client, request.message, request.history, text_model)
@@ -1157,7 +1289,7 @@ async def chat_stream(request: ChatRequest):
 async def index() -> FileResponse:
     if not HTML_FILE.exists():
         raise HTTPException(status_code=404, detail="demotrial.html 不存在")
-    return FileResponse(HTML_FILE)
+    return FileResponse(HTML_FILE, headers={"Cache-Control": "no-cache, must-revalidate"})
 
 
 @app.get("/notes-data.js")
