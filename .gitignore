@@ -20,3 +20,6 @@ dist/
 build/
 *.log
 .vercel/
+_compare/
+_think_probe.py
+_think_probe_*.txt

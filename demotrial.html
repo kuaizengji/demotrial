@@ -1693,6 +1693,8 @@
             color: #536579;
         }
         .chat-knowledge-save-btn {
+            position: relative;
+            z-index: 1;
             flex-shrink: 0;
             border: 1px solid rgba(125, 146, 178, 0.22);
             background: rgba(255, 255, 255, 0.92);
@@ -1914,8 +1916,8 @@
             margin-top: 0.72rem;
             padding-top: 0.72rem;
             border-top: 1px solid rgba(203, 213, 225, 0.7);
-            max-height: 18rem;
-            overflow: auto;
+            max-height: none;
+            overflow: visible;
         }
         .chat-thinking-preview {
             display: none;
@@ -2334,6 +2336,7 @@
             }
             #chat-window {
                 -webkit-overflow-scrolling: touch;
+                overflow-anchor: none;
             }
             .chat-save-note-btn,
             .chat-knowledge-save-btn {
@@ -2366,7 +2369,28 @@
                 max-width: 92% !important;
             }
             .chat-thinking-body {
-                max-height: 12.5rem;
+                max-height: none;
+                overflow: visible;
+            }
+            .memo-card {
+                padding-bottom: 2.6rem;
+            }
+            .memo-card-actions,
+            .memo-card:hover .memo-card-actions {
+                opacity: 1;
+                pointer-events: auto;
+                transform: none;
+            }
+            .memo-action-btn {
+                width: 2rem;
+                height: 2rem;
+                font-size: 0.75rem;
+            }
+            .chat-knowledge-save-btn,
+            .chat-save-note-btn {
+                min-height: 2.25rem;
+                min-width: 2.75rem;
+                padding: 0.35rem 0.8rem;
             }
             .chat-thinking-panel.is-finished.is-collapsed .chat-thinking-preview {
                 display: none !important;
@@ -3346,7 +3370,7 @@
                 <button id="new-chat-btn" class="soft-primary-btn flex items-center gap-2 text-white font-semibold px-3 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm transition ml-auto" onclick="createNewChat()"><i class="fa-solid fa-plus text-xs"></i>新对话</button>
             </div>
             <div class="chat-session-head shrink-0"><h1 class="text-brand tracking-wide">对话</h1><p id="chat-meta">陶然 · 高考英语</p></div>
-            <div id="chat-window" class="flex-1 overflow-y-auto custom-scrollbar" style="min-height:0;">
+            <div id="chat-window" class="flex-1 overflow-y-auto custom-scrollbar" style="min-height:0; overflow-anchor:none;">
                 <div class="message-animate flex flex-col items-start"><span class="chat-meta-line ml-0.5">陶然 · 刚刚</span><div class="chat-bubble-ai chat-text leading-relaxed">你好，我是陶然。阅读、完形、语法填空都可以直接问。</div></div>
             </div>
             <div class="chat-composer-wrap p-3 lg:p-4 shrink-0">
@@ -4177,7 +4201,7 @@
             }
 
             function isJsonConstructionNoise(text) {
-                return /```|(?:构建|构造|组装|生成|填写|填充|输出|按照|遵循|符合)\s*(?:这个|最终|固定|以下|下面)?\s*(?:json|JSON|格式|schema|字段)|reasoning_steps|stem_understanding|distractor_analysis|knowledge_cards|knowledge_methodology|need_more_context|unsupported_reason|question_type|"supported"\s*:|固定\s*JSON|合法\s*JSON|字段名|按\s*schema|输出格式|JSON\s*对象|json\s*对象|键值对|根据(?:我的)?(?:角色设定|系统规则)|回顾规则|根据规则|查看规则|系统规则|检查规则|对照规则|我需要输出|输出必须是|正式回答只输出|字段必须正确|现在(?:开始)?(?:写|构造|组装|输出|填写)\s*JSON|现在，写JSON|写JSON|构造JSON|组装JSON|检查字段|字段怎么填|确保不添加任何额外内容|不要\s*Markdown|不要代码块|不要前言|"focus"\s*:|"basis"\s*:|"conclusion"\s*:|"step"\s*:|列出推理步骤|干扰项剖析|知识点与方法论|采用以下格式|思考结束后|schema/i.test(String(text || ''));
+                return /```|(?:构建|构造|组装|生成|填写|填充|输出|按照|遵循|符合)\s*(?:这个|最终|固定|以下|下面)?\s*(?:json|JSON|格式|schema|字段)|reasoning_steps|stem_understanding|distractor_analysis|knowledge_cards|knowledge_methodology|need_more_context|unsupported_reason|question_type|follow_up|"supported"\s*:|固定\s*JSON|合法\s*JSON|字段名|按\s*schema|输出格式|JSON\s*对象|json\s*对象|键值对|根据(?:我的)?(?:角色设定|系统规则)|回顾规则|根据规则|查看规则|系统规则|检查规则|对照规则|我需要输出|输出必须是|正式回答只输出|字段必须正确|现在(?:开始)?(?:写|构造|组装|输出|填写)\s*JSON|现在，写JSON|写JSON|构造JSON|组装JSON|检查字段|字段怎么填|确保不添加任何额外内容|不要\s*Markdown|不要代码块|不要前言|"focus"\s*:|"basis"\s*:|"conclusion"\s*:|"step"\s*:|列出推理步骤|干扰项剖析|知识点与方法论|采用以下格式|思考结束后|schema/i.test(String(text || ''));
             }
 
             function stripJsonPayloads(text) {
@@ -4186,32 +4210,56 @@
                     .replace(/\{[\s\S]*?"supported"\s*:[\s\S]*?\}\s*/g, '\n');
             }
 
+            function salvageThinkingSentence(item) {
+                let text = String(item || '').replace(/[ \t]{2,}/g, ' ').replace(/^[ \t：:、.\-]+|[ \t：:、.\-]+$/g, '').trim();
+                if (!text || /^\s*[{[]/.test(text) || /^"[a-z_]+"\s*:/.test(text)) return '';
+                if (/(?:现在|接下来|然后|最后|下面)(?:开始)?(?:构造|组装|生成|输出|填写|按照)\s*(?:这个|最终|固定|以下)?\s*(?:JSON|json|字段|格式)|思考结束后|正式回答只输出|输出一个\s*JSON|现在[，,]根据要求|现在我需要按照要求|现在[，,]\s*(?:输出|写)\s*(?:JSON|json)?/i.test(text)
+                    && !/空\s*[（(]?\d|第\s*\d+\s*空/.test(text)) {
+                    return '';
+                }
+                const noisy = isJsonConstructionNoise(text) || /(?:JSON|字段名|输出格式|schema|知识卡片|输出要求|第\s*\d+\s*(?:条|点))/i.test(text);
+                if (!noisy) return text;
+                let kept = text.replace(/```|(?:构建|构造|组装|生成|填写|填充|输出|按照|遵循|符合)\s*(?:这个|最终|固定|以下|下面)?\s*(?:json|JSON|格式|schema|字段)|reasoning_steps|stem_understanding|distractor_analysis|knowledge_cards|knowledge_methodology|need_more_context|unsupported_reason|question_type|schema|JSON|字段名|输出格式|知识卡片|输出要求|第\s*\d+\s*(?:条|点)|知识点\s*\d+|方法论\s*\d+/gi, '');
+                kept = kept.replace(/在里[，,]?/g, '').replace(/[ \t]{2,}/g, ' ').replace(/^[ \t：:、,，；;]+|[ \t：:、,，；;]+$/g, '').trim();
+                const cjk = (kept.match(/[\u4e00-\u9fff]/g) || []).length;
+                if (cjk >= 16 && /空\s*[（(]?\d|第\s*\d+\s*[空题]|排除|原句|选项|所以|因此|填|改为|冲突|矛盾|发音|时态|因为|不能|不对|正确/.test(kept)) return kept;
+                return '';
+            }
+
             function sanitizeThinkingTranscript(text, live = false) {
                 let source = stripJsonPayloads(text);
+                source = source.replace(/(?:根据)?(?:教学体系|语法方法论|完型方法论|完形方法论|阅读方法论|七选五方法论|方法论|知识点)?(?:中的)?(?:第\s*\d+\s*(?:条|点)|规则\s*\d+)(?:提到了|提到|规定|指出|说)?\s*[：:、.]?/g, '');
+                source = source.replace(/(?:方法论|知识点)\s*\d+\s*[：:、.]|根据(?:知识点|方法论)\s*\d+/g, '');
+                source = source.replace(/(?:从|根据|回顾)?(?:语法|完型|完形|阅读)?方法论[ \t]*(?:\n+\s*\d+\.\s+[^\n]*)+/g, '');
+                source = source.replace(/^\s*(?:[5-9]|[1-9]\d+)\.\s+(?=.*(?:被动|非谓语|介词|完成时|提示词|动词后面|是否.?只用))[^\n]+/gm, '');
+                source = source.replace(/"\s*(?:[5-9]|[1-9]\d+)\.\s+/g, '"');
+                source = source.replace(/在?(?:教学体系|语法方法论|完型方法论|完形方法论|阅读方法论)(?:的(?:语法|完型|完形|阅读)?方法论)?中[，,]?/g, '');
+                source = source.replace(/调用教学体系[：:]\s*/g, '');
                 const jsonStart = source.search(/```|\{\s*"(?:supported|question_type|reasoning_steps|stem_understanding)"/);
                 if (jsonStart >= 0) source = source.slice(0, jsonStart);
-                const formatHead = source.search(/(?:现在|接下来|然后|最后|下面)(?:开始)?(?:构造|组装|生成|输出|填写|按照)\s*(?:这个|最终|固定|以下)?\s*(?:JSON|json|字段|格式)|思考结束后|正式回答只输出|输出一个 JSON|输出一个JSON/);
-                if (formatHead >= 0) source = source.slice(0, formatHead);
+                const handoffRe = /(?:现在|接下来|然后|最后|下面)(?:开始)?(?:构造|组装|生成|输出|填写|按照)\s*(?:这个|最终|固定|以下)?\s*(?:JSON|json|字段|格式)|思考结束后|正式回答只输出|输出一个 JSON|输出一个JSON|现在[，,]根据要求|现在我需要按照要求|现在[，,]\s*(?:输出|写)\s*(?:JSON|json)?|(?:question_type|subtype|stem_understanding|reasoning_steps|knowledge_methodology|distractor_analysis)\s*[:：]/gi;
+                let handoffMatch;
+                let lastCut = -1;
+                while ((handoffMatch = handoffRe.exec(source)) !== null) lastCut = handoffMatch.index;
+                if (lastCut >= 0) {
+                    const tail = source.slice(lastCut);
+                    if (!/空\s*[（(]?\d|第\s*\d+\s*[空题]|排除|原句|原文/.test(tail)) source = source.slice(0, lastCut);
+                }
+                source = source.split(/\n/).filter(line => !/用户提示|教学体系|不要编造|第\s*\d+\s*条|规则\s*\d+|推理步骤|^\s*(?:[1-9]\d+)\.\s*|(?:focus|basis|conclusion|answer|question_type|stem_understanding)\s*[:：]/i.test(line)).join('\n');
 
                 const blocks = source.split(/\n+/);
                 const cleaned = [];
                 blocks.forEach(block => {
                     const sentences = String(block || '').split(/(?<=[。！？!?\n])/);
                     const kept = sentences
-                        .map(item => item.trim())
-                        .filter(item => (
-                            item
-                            && !isJsonConstructionNoise(item)
-                            && !/^\s*[{[]/.test(item)
-                            && !/^"[a-z_]+"\s*:/.test(item)
-                            && !/(?:JSON|字段名|输出格式|schema|知识卡片|输出要求)/i.test(item)
-                        ));
+                        .map(item => salvageThinkingSentence(item))
+                        .filter(Boolean);
                     if (kept.length) cleaned.push(kept.join(''));
                 });
 
                 if (live && cleaned.length) {
                     const last = cleaned[cleaned.length - 1];
-                    if (last && !/[。！？!?\n]$/.test(last) && /JSON|字段|schema|reasoning_|knowledge_|supported|输出格式|格式要求|"[a-z_]+"\s*:/i.test(last)) {
+                    if (last && !/[。！？!?\n]$/.test(last) && /JSON|字段|schema|reasoning_|knowledge_|supported|输出格式|格式要求|"[a-z_]+"\s*:|第\s*\d+\s*条/i.test(last)) {
                         cleaned.pop();
                     }
                 }
@@ -4287,9 +4335,11 @@
 
             function scrollChatToElement(element, offset = 10) {
                 if (!chatWindow || !element) return;
-                const chatRect = chatWindow.getBoundingClientRect();
-                const elementRect = element.getBoundingClientRect();
-                chatWindow.scrollTop += elementRect.top - chatRect.top - offset;
+                runProgrammaticScroll(() => {
+                    const chatRect = chatWindow.getBoundingClientRect();
+                    const elementRect = element.getBoundingClientRect();
+                    chatWindow.scrollTop += elementRect.top - chatRect.top - offset;
+                });
             }
 
             function getStructuredReplyPreview(data) {
@@ -4324,21 +4374,44 @@
                 return /^(判断题型|调用方法体系|调用语法方法论|调用阅读方法论|调用完型方法论|判断信息是否完整|判断现有信息是否足够|给出当前可判断的方向|判断请求性质|判断输入范围|确定优先讲解对象|判断空格类型|本题考查|这是一道|分析选项)$/.test(String(focus || '').trim());
             }
 
+            function hasInlineAbcdOptions(text) {
+                return /A[.．、:：)\s][A-Za-z].{0,80}?B[.．、:：)\s][A-Za-z].{0,80}?C[.．、:：)\s][A-Za-z].{0,80}?D[.．、:：)\s][A-Za-z]/i.test(String(text || ''));
+            }
+
             function hasExplicitChoiceOptions(...texts) {
                 const source = texts.map(item => String(item || '')).join('\n');
                 const marked = ['A', 'B', 'C', 'D'].filter(letter => (
                     new RegExp(`(?:^|[\\n\\r])\\s*${letter}[\\.．、\\)]\\s+\\S`).test(source)
                 ));
                 if (marked.length >= 3) return true;
+                if (hasInlineAbcdOptions(source)) return true;
                 return /(?:选项|choose|choices?)\s*[A-D]/i.test(source) && /[A-D][\.．、\)]/.test(source) && marked.length >= 2;
             }
 
+            function looksLikeGrammarHintText(text) {
+                return /\((?![A-Da-d]\))([A-Za-z][A-Za-z\s\-']{1,24})\)|（(?![A-Da-d]）)([A-Za-z][A-Za-z\s\-']{1,24})）/.test(String(text || ''));
+            }
+
+            function looksLikeClozeOptionGroups(text) {
+                const matches = String(text || '').match(/(?:^|\n)\s*(?:\(\s*)?\d{1,2}(?:\s*\))?\s*[.．、:：]?\s*A[.．、:：)\s]/gm);
+                return (matches || []).length >= 2;
+            }
+
             function looksLikeGrammarFillText(text) {
-                return /\((?![A-Da-d]\))([A-Za-z][A-Za-z\s\-']{1,24})\)|（(?![A-Da-d]）)([A-Za-z][A-Za-z\s\-']{1,24})）|_{3,}|语法填空|无提示词|有提示词|词性转换/.test(String(text || ''));
+                const source = String(text || '');
+                if (looksLikeGrammarHintText(source)) return true;
+                return /_{3,}|_{2,}/.test(source) && !looksLikeClozeBlankText(source) && !hasExplicitChoiceOptions(source);
             }
 
             function looksLikeClozeBlankText(text) {
-                return /第\s*\d+\s*空|\(\s*\d{1,2}\s*\)\s*[_.＿—–-]{2,}|\(\s*\d{1,2}\s*\)\s*_+/.test(String(text || ''));
+                const source = String(text || '');
+                if (looksLikeClozeOptionGroups(source)) return true;
+                if ((source.match(/\(\s*\d{1,2}\s*\)\s*[A-D]\b/g) || []).length >= 2) return true;
+                if (/\(\s*\d{1,2}\s*\)\s*[_.＿—–-]{2,}/.test(source) && hasExplicitChoiceOptions(source)) return true;
+                if (/第\s*\d+\s*空/.test(source) && hasExplicitChoiceOptions(source)) return true;
+                if (/完形|完型/.test(source) && (hasExplicitChoiceOptions(source) || /_{2,}/.test(source))) return true;
+                if ((source.match(/_{2,}/g) || []).length >= 2 && hasExplicitChoiceOptions(source)) return true;
+                return false;
             }
 
             function looksLikeReadingText(text) {
@@ -4349,17 +4422,20 @@
                 const claimedType = String(claimed || '').replace(/^完形$/, '完型').trim();
                 const source = `${claimedType}\n${extraText || ''}`;
                 const hasChoices = hasExplicitChoiceOptions(source);
+                const grammarHint = looksLikeGrammarHintText(source);
                 const grammarFill = looksLikeGrammarFillText(source);
                 const clozeBlanks = looksLikeClozeBlankText(source);
+                const clozeNamed = /完型|完形/.test(source);
                 const readingLike = looksLikeReadingText(source) || claimedType === '阅读';
 
                 if (/七选五/.test(source)) return '七选五';
-                if (grammarFill && !(hasChoices && clozeBlanks)) return '语法';
-                if (readingLike && !clozeBlanks) return '阅读';
-                if (hasChoices && clozeBlanks) return '完型';
-                if (clozeBlanks && !hasChoices) return '语法';
+                if (/改错[:：]/.test(source)) return '改错';
+                if (/翻译[:：]/.test(source) && !grammarHint && !clozeBlanks) return '翻译';
+                if (readingLike && !clozeBlanks && (source.match(/\(\s*\d{1,2}\s*\)\s*[A-D]\b/g) || []).length < 2) return '阅读';
+                if (grammarHint && !hasChoices && !clozeBlanks) return '语法';
+                if (clozeBlanks || (clozeNamed && !grammarHint)) return '完型';
+                if (grammarFill) return '语法';
                 if (hasChoices && !readingLike) return '完型';
-                if (/完型|完形/.test(claimedType) && !hasChoices) return '语法';
                 if (/语法/.test(claimedType)) return '语法';
                 if (/完型|完形/.test(claimedType)) return '完型';
                 if (/阅读/.test(claimedType)) return '阅读';
@@ -4370,7 +4446,12 @@
 
             function applyCorrectedQuestionType(data) {
                 if (!data) return data;
-                const extra = [data.subtype, data.stemUnderstanding, data.answer, data.followUp].join('\n');
+                const stepText = (Array.isArray(data.reasoningSteps) ? data.reasoningSteps : [])
+                    .map(step => [step && step.focus, step && step.basis, step && step.conclusion].join(' '))
+                    .join('\n');
+                const extra = [data.subtype, data.stemUnderstanding, data.answer, data.followUp, stepText]
+                    .concat(Array.isArray(data.knowledgeMethodology) ? data.knowledgeMethodology : [])
+                    .join('\n');
                 data.questionType = correctQuestionType(data.questionType, extra);
                 return data;
             }
@@ -4403,12 +4484,13 @@
                 return pieces.join(' ').trim();
             }
 
-            function getStructuredExplanationLines(data, maxCount = 3) {
+            function getStructuredExplanationLines(data, maxCount = 24) {
                 const steps = Array.isArray(data && data.reasoningSteps) ? data.reasoningSteps : [];
                 const lines = steps
                     .map(joinReasoningSentence)
                     .filter(item => item && !/^(本题考查|这是一道|判断题型|调用方法)/.test(item))
                     .flatMap(splitStructuredDisplayLines)
+                    .filter(item => !isPastedQuestionStemLine(item))
                     .slice(0, maxCount);
 
                 if (lines.length) return lines;
@@ -4418,6 +4500,101 @@
                 }
 
                 return [];
+            }
+
+            function blankNumsInText(text) {
+                const nums = new Set();
+                const re = /(?:空\s*|第\s*)(\d{1,2})(?:\s*空)?|\(\s*(\d{1,2})\s*\)/g;
+                let match;
+                while ((match = re.exec(String(text || '')))) {
+                    const value = Number(match[1] || match[2]);
+                    if (value >= 1 && value <= 20) nums.add(value);
+                }
+                return nums;
+            }
+
+            function isPastedQuestionStemLine(line) {
+                const text = String(line || '').trim();
+                if (!text) return false;
+                const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+                if (cjk >= 8) return false;
+                return /^(?:\d+\s*[.．、]\s*)?(?:What|Why|Which|How|When|Where|Who|According to|The (?:passage|author|notice|text|main))\b/i.test(text);
+            }
+
+            function stripLeadingQuestionStem(body) {
+                const lines = String(body || '').split(/\n/);
+                let index = 0;
+                while (index < lines.length) {
+                    const line = lines[index].trim();
+                    if (!line) {
+                        index += 1;
+                        continue;
+                    }
+                    const cjk = (line.match(/[\u4e00-\u9fff]/g) || []).length;
+                    if (isPastedQuestionStemLine(line) || (/^[A-G][.．、)]\s+\S/.test(line) && cjk < 4) || /^(?:题干|题目)\s*[:：]?$/.test(line)) {
+                        index += 1;
+                        continue;
+                    }
+                    break;
+                }
+                return lines.slice(index).join('\n').trim();
+            }
+
+            function extractBlankTeachBlocksFromText(text) {
+                const source = String(text || '');
+                const re = /(?:^|\n)\s*\**\s*(空\s*[（(]?\d{1,2}[)）]?(?:\s*[-~—–到至]\s*[（(]?\d{1,2}[)）]?)?|第\s*\d{1,2}(?:\s*[-~—–到至]\s*\d{1,2})?\s*空|第\s*\d{1,2}\s*题|(?:空\s*)?\d{1,2})\s*[.．、:：]\s*/g;
+                const matches = [];
+                let match;
+                while ((match = re.exec(source))) {
+                    matches.push({
+                        label: String(match[1] || '').replace(/\s+/g, ''),
+                        end: re.lastIndex,
+                        start: match.index
+                    });
+                }
+                return matches.map((item, index) => {
+                    const stop = index + 1 < matches.length ? matches[index + 1].start : source.length;
+                    const body = stripLeadingQuestionStem(String(source.slice(item.end, stop).trim()
+                        .replace(/(?:现在|接下来)?我?需要按照要求输出[\s\S]*$/, '')
+                        .trim())
+                        .split(/\n/)
+                        .filter(line => !/用户提示|教学体系|不要编造|第\s*\d+\s*条|规则\s*\d+|推理步骤|^\s*(?:[1-9]\d+)\.\s*|(?:focus|basis|conclusion|answer|question_type|stem_understanding)\s*[:：]/i.test(line))
+                        .join('\n')
+                        .trim());
+                    const label = String(item.label || '').replace(/\s+/g, '');
+                    const focus = /^\d+$/.test(label) ? `空${Number(label)}` : label;
+                    if (body.length < 24 || body.length > 1200) return null;
+                    if (/完型知识点|名词题[:：]|动词题[:：]|方法论包括/.test(body.slice(0, 80))) return null;
+                    if (!/_{2,}|原句|原文|排除|冲突|正确|[A-D]\./.test(body.slice(0, 180))) return null;
+                    if (!/[A-Za-z]{3,}|选项|选\s*[A-D]|排除|原句|因为|所以/.test(body)) return null;
+                    if (/现在我需要|按照要求输出|输出完整/.test(body) && body.length < 48) return null;
+                    return { step: index + 1, focus, basis: body, conclusion: '' };
+                }).filter(Boolean);
+            }
+
+            function enrichStructuredWithThinkingBlanks(data, thinkingText) {
+                if (!data) return data;
+                const blocks = extractBlankTeachBlocksFromText(thinkingText);
+                if (!blocks.length) return data;
+                const steps = Array.isArray(data.reasoningSteps) ? data.reasoningSteps.slice() : [];
+                const covered = new Set();
+                steps.forEach(step => {
+                    blankNumsInText([step && step.focus, step && step.basis, step && step.conclusion].join(' ')).forEach(num => covered.add(num));
+                });
+                const thinkNums = new Set();
+                blocks.forEach(block => blankNumsInText(block.focus).forEach(num => thinkNums.add(num)));
+                if (covered.size && [...thinkNums].every(num => covered.has(num))) return data;
+
+                const used = new Set(covered);
+                const merged = steps.slice();
+                blocks.forEach(block => {
+                    const nums = [...blankNumsInText(block.focus)];
+                    if (nums.length && nums.every(num => used.has(num))) return;
+                    merged.push({ ...block, step: merged.length + 1 });
+                    nums.forEach(num => used.add(num));
+                });
+                data.reasoningSteps = merged.map((step, index) => ({ ...step, step: index + 1 }));
+                return data;
             }
 
             function splitStructuredDisplayLines(text) {
@@ -4438,7 +4615,7 @@
             function structuredToPlainBody(data) {
                 if (!data) return '';
                 const parts = [];
-                const explanation = getStructuredExplanationLines(data, 8);
+                const explanation = getStructuredExplanationLines(data, 24);
                 if (explanation.length) parts.push(explanation.join('\n\n'));
                 if (data.answer && data.subtype !== '问候') {
                     parts.push(data.answer.startsWith('答案') ? data.answer : `答案：${data.answer}`);
@@ -4468,15 +4645,22 @@
                 return splitStructuredDisplayLines(String(text).replace(/\s*[；;]\s*/g, '\n'));
             }
 
-            function isUsefulKnowledgeLine(text) {
+            function looksLikeMethodRule(text) {
                 const raw = String(text || '').trim();
-                if (!raw) return false;
-                if (raw.length > 160) return false;
-                if (/(本题|答案是|第\s*\d+\s*空)/.test(raw)) return false;
-                if (/(与语句理解|理解能力相关|与理解有关|需要结合语境|结合上下文判断|具体问题具体分析|选择与.*相关|考查关系词|考查冠词)/.test(raw)) return false;
-                const compact = raw.replace(/[\s,，。．.；;:：、·\-—–“”"']+/g, '');
-                if (compact.length < 6) return false;
-                return /如果|若|当|时|则|就|用|填|选|使用|只能|必须|不要|禁止|不是|没有|改成|变成|独一无二|主动|被动|：|:|→|->/.test(raw);
+                if (!raw || raw.length > 280) return false;
+                if (/^(?:答案|answer)\s*[:：]/.test(raw)) return false;
+                if (/^(?:第\s*)?\d+\s*[.．、]\s*[A-D]\b/.test(raw)) return false;
+                if (/(与语句理解|理解能力相关|与理解有关|需要结合语境|结合上下文判断|具体问题具体分析|选择与.*相关)/.test(raw)) return false;
+                if (/(考查关系词|考查冠词)/.test(raw) && !/(where|which|when|why|\ban\b|填|用|发音)/i.test(raw)) return false;
+                const words = raw.match(/[A-Za-z]+/g) || [];
+                if (words.length >= 8 && raw.length > 80) return false;
+                const compact = raw.replace(/[\s,，。．.；;:：、·\-—–“”"'（）()]+/g, '');
+                if (compact.length < 8) return false;
+                return /如果|若|当|则|复现|概括|态度|起承转合|核心|定位|同义|主旨|套路|主动|被动|谓语|非谓语|冠词|从句|转折|因果|正负|动作链|一致|匹配|需|发音|时态|比较|单数|复数|介词|动名词|不定式|常识|原文没有|关系副词|where|which|when|：|:|→|->/i.test(raw);
+            }
+
+            function isUsefulKnowledgeLine(text) {
+                return looksLikeMethodRule(text);
             }
 
             function splitKnowledgeCandidateLines(text) {
@@ -4501,7 +4685,7 @@
                 const block = (nextHeading >= 0 ? rest.slice(0, nextHeading) : rest).trim();
                 const unique = [];
                 splitKnowledgeCandidateLines(block).forEach(item => {
-                    if (item.length < 6 || item.length > 160) return;
+                    if (item.length < 6 || item.length > 280) return;
                     if (/^(后续|补充说明|答案|具体讲解)/.test(item)) return;
                     if (unique.some(existing => existing === item || existing.includes(item) || item.includes(existing))) return;
                     unique.push(item);
@@ -4531,7 +4715,8 @@
                 if (!data) return [];
                 const primary = mergeKnowledgeLines(data.knowledgeMethodology).filter(isUsefulKnowledgeLine);
                 const teaching = mergeKnowledgeLines(data.teachingPoints || extractTeachingPointLines(data.followUp));
-                const merged = mergeKnowledgeLines([...primary, ...teaching]);
+                const followRule = looksLikeMethodRule(data.followUp) ? [String(data.followUp).trim()] : [];
+                const merged = mergeKnowledgeLines([...primary, ...teaching, ...followRule]);
                 if (merged.length) return merged.slice(0, 4);
 
                 const cards = mergeKnowledgeLines(data.knowledgeCards)
@@ -4552,7 +4737,15 @@
             function getVisibleFollowUp(data) {
                 const raw = String(data && data.followUp || '').trim();
                 if (!raw) return '';
-                if (!getKnowledgeMethodologyLines(data).length) return raw;
+                const knowledge = getKnowledgeMethodologyLines(data);
+                const normalized = normalizeNoteRawContent(raw);
+                if (knowledge.some(item => {
+                    const note = normalizeNoteRawContent(item);
+                    return note === normalized || note.includes(normalized) || normalized.includes(note);
+                })) {
+                    return '';
+                }
+                if (!knowledge.length) return raw;
                 return stripTeachingPointBlock(raw);
             }
 
@@ -4575,7 +4768,7 @@
                     return `
                     <div class="chat-knowledge-item" data-knowledge-index="${index}">
                         <div class="chat-knowledge-text">${renderPlainText(item)}</div>
-                        <button type="button" class="chat-knowledge-save-btn${already ? ' is-saved' : ''}" data-save-knowledge-item data-knowledge-index="${index}" title="把这条教学要点存入笔记">${already ? '已存' : '存入'}</button>
+                        <button type="button" class="chat-knowledge-save-btn${already ? ' is-saved' : ''}" data-save-knowledge-item data-knowledge-index="${index}" data-knowledge-text="${escapeHtml(item)}" title="把这条教学要点存入笔记">${already ? '已存' : '存入'}</button>
                     </div>
                 `;
                 }).join('');
@@ -4707,33 +4900,46 @@
             }
 
             let chatStickToBottom = true;
-            let keepThinkingInView = false;
+            let ignoreProgrammaticScroll = 0;
+            let lastChatScrollTop = 0;
 
             function isChatNearBottom(threshold = 96) {
                 if (!chatWindow) return true;
                 return chatWindow.scrollHeight - chatWindow.scrollTop - chatWindow.clientHeight <= threshold;
             }
 
+            function rememberChatScroll() {
+                if (chatWindow) lastChatScrollTop = chatWindow.scrollTop;
+            }
+
+            function runProgrammaticScroll(apply) {
+                ignoreProgrammaticScroll += 1;
+                try {
+                    apply();
+                } finally {
+                    rememberChatScroll();
+                    requestAnimationFrame(() => {
+                        ignoreProgrammaticScroll = Math.max(0, ignoreProgrammaticScroll - 1);
+                        rememberChatScroll();
+                    });
+                }
+            }
+
             function scrollChatToBottom(force = false) {
                 if (!chatWindow) return;
                 if (!force && !chatStickToBottom) return;
-                if (keepThinkingInView) {
-                    const thinking = chatWindow.querySelector('.message-animate:last-child .chat-thinking-panel');
-                    if (thinking) {
-                        const chatRect = chatWindow.getBoundingClientRect();
-                        const headerRect = thinking.getBoundingClientRect();
-                        if (headerRect.top < chatRect.top + 4 || headerRect.top > chatRect.top + 72) {
-                            scrollChatToElement(thinking, 8);
-                        }
-                        return;
-                    }
-                }
-                chatWindow.scrollTop = chatWindow.scrollHeight;
+                runProgrammaticScroll(() => {
+                    chatWindow.scrollTop = chatWindow.scrollHeight;
+                });
             }
 
             function pinChatToBottom() {
                 chatStickToBottom = true;
                 scrollChatToBottom(true);
+            }
+
+            function releaseChatFollow() {
+                chatStickToBottom = false;
             }
 
             function animateTextReveal(target, text, renderFn = renderPlainText) {
@@ -4870,7 +5076,7 @@
                         row.dataset.knowledgeIndex = String(index);
                         row.innerHTML = `
                             <div class="chat-knowledge-text"></div>
-                            <button type="button" class="chat-knowledge-save-btn${already ? ' is-saved' : ''}" data-save-knowledge-item data-knowledge-index="${index}" title="把这条教学要点存入笔记">${already ? '已存' : '存入'}</button>
+                            <button type="button" class="chat-knowledge-save-btn${already ? ' is-saved' : ''}" data-save-knowledge-item data-knowledge-index="${index}" data-knowledge-text="${escapeHtml(item)}" title="把这条教学要点存入笔记">${already ? '已存' : '存入'}</button>
                         `;
                         list.appendChild(row);
                         animatedFields.push({
@@ -4911,15 +5117,13 @@
                 const thinkingPanel = bubble.querySelector('.chat-thinking-panel');
                 const target = bubble.querySelector('.chat-ai-reply-body') || (thinkingPanel ? null : bubble);
                 if (!target) return;
-                const previousKeepThinking = keepThinkingInView;
-                if (thinkingPanel) {
-                    keepThinkingInView = true;
-                    scrollChatToElement(thinkingPanel, 8);
-                }
                 try {
                     const structured = parseStructuredReply(content);
                     if (structured && structured.supported) {
-                        await animateStructuredReplyBubble(target, structured);
+                        const thinkingText = thinkingPanel && thinkingPanel.querySelector('.chat-thinking-stream')
+                            ? thinkingPanel.querySelector('.chat-thinking-stream').textContent
+                            : '';
+                        await animateStructuredReplyBubble(target, enrichStructuredWithThinkingBlanks(structured, thinkingText));
                         scrollChatToBottom();
                         return;
                     }
@@ -4928,13 +5132,14 @@
                     target.innerHTML = renderUnstructuredReplyHtml(content);
                     scrollChatToBottom();
                 } finally {
-                    keepThinkingInView = previousKeepThinking;
+                    scrollChatToBottom();
                 }
             }
 
-            function renderAiMessageContent(content) {
-                const structured = parseStructuredReply(content);
+            function renderAiMessageContent(content, thinkingText = '') {
+                let structured = parseStructuredReply(content);
                 if (structured && structured.supported) {
+                    structured = enrichStructuredWithThinkingBlanks(structured, thinkingText);
                     return {
                         html: renderStructuredReply(structured),
                         isStructured: true,
@@ -6411,7 +6616,6 @@
                     if (previewEl) previewEl.textContent = finished ? thinkingPreviewText(text) : '';
                     const body = root.querySelector('.chat-thinking-body');
                     if (body) body.style.display = text ? '' : 'none';
-                    if (body) body.scrollTop = body.scrollHeight;
                     scrollChatToBottom();
                 }
 
@@ -6550,17 +6754,31 @@
             }
 
             chatWindow.addEventListener('scroll', () => {
-                chatStickToBottom = isChatNearBottom();
+                if (!chatWindow || ignoreProgrammaticScroll > 0) return;
+                const top = chatWindow.scrollTop;
+                if (top < lastChatScrollTop - 2) {
+                    chatStickToBottom = false;
+                } else if (top > lastChatScrollTop + 2 && isChatNearBottom(24)) {
+                    chatStickToBottom = true;
+                }
+                lastChatScrollTop = top;
             }, { passive: true });
-            chatWindow.addEventListener('wheel', () => {
-                requestAnimationFrame(() => {
-                    chatStickToBottom = isChatNearBottom();
-                });
+            chatWindow.addEventListener('wheel', (event) => {
+                if (event.deltaY < 0 || !isChatNearBottom(48)) {
+                    releaseChatFollow();
+                }
+            }, { passive: true });
+            chatWindow.addEventListener('touchmove', () => {
+                if (!isChatNearBottom(48)) releaseChatFollow();
+            }, { passive: true });
+            chatWindow.addEventListener('pointerdown', (event) => {
+                if (event.pointerType === 'touch' && !isChatNearBottom(48)) releaseChatFollow();
             }, { passive: true });
             chatWindow.addEventListener('click', function(event) {
                 const knowledgeBtn = event.target.closest('[data-save-knowledge-item]');
                 if (knowledgeBtn && chatWindow.contains(knowledgeBtn)) {
                     event.preventDefault();
+                    event.stopPropagation();
                     const messageEl = knowledgeBtn.closest('.message-animate');
                     const content = (messageEl && messageEl.dataset.aiContent) || '';
                     const items = getSaveableKnowledgeLines(content, parseStructuredReply(content));
@@ -6569,9 +6787,9 @@
                     const fromDomText = fromDom && fromDom.querySelector('.chat-knowledge-text')
                         ? String(fromDom.querySelector('.chat-knowledge-text').textContent || '').trim()
                         : '';
-                    const itemText = Number.isFinite(itemIndex) && items[itemIndex]
-                        ? items[itemIndex]
-                        : fromDomText;
+                    const itemText = String(knowledgeBtn.dataset.knowledgeText || '').trim()
+                        || fromDomText
+                        || (Number.isFinite(itemIndex) ? (items[itemIndex] || '') : '');
                     const note = saveKnowledgeMethodologyFromMessage(messageEl, {
                         itemText,
                         button: knowledgeBtn
@@ -6638,7 +6856,7 @@
                         </div>
                     `;
                 } else {
-                    const aiRender = sender === 'ai' ? renderAiMessageContent(content) : null;
+                    const aiRender = sender === 'ai' ? renderAiMessageContent(content, snapshotToThinkingText(options.thinkingSnapshot)) : null;
                     const renderedContent = sender === 'ai'
                         ? (animateTyping ? '' : aiRender.html)
                         : escapeHtml(content).replace(/\n/g, '<br>');
@@ -7364,8 +7582,9 @@
             function persistSavedNotes() {
                 try {
                     localStorage.setItem(SAVED_NOTES_KEY, JSON.stringify(savedNotes));
+                    return true;
                 } catch (error) {
-                    // 忽略本地存储异常
+                    return false;
                 }
             }
 
@@ -7427,8 +7646,15 @@
             }
 
             function inferMemoTagFromText(...parts) {
-                const claimed = parts[0] || '';
+                const claimed = String(parts[0] || '').replace(/^完形$/, '完型').trim();
                 const extra = parts.slice(1).join('\n');
+                const blob = `${claimed}\n${extra}`;
+                if (/完型|完形/.test(claimed) && !looksLikeGrammarHintText(blob)) return 'cloze';
+                if (/阅读|七选五/.test(claimed)) return 'reading';
+                if (/(起承转合|名词复现|动词空格|名词空格|形容词空格|副词空格|记叙文.*套路)/.test(blob)
+                    && !/语法填空|无提示词/.test(blob)) {
+                    return 'cloze';
+                }
                 const type = correctQuestionType(claimed, extra);
                 if (type === '完型' || type === '完形') return 'cloze';
                 if (type === '阅读' || type === '七选五') return 'reading';
@@ -7560,14 +7786,12 @@
                     savedNotes.splice(existingIndex, 1);
                     savedNotes.unshift(merged);
                     savedNotes = savedNotes.slice(0, 80);
-                    persistSavedNotes();
-                    return { note: merged, created: false };
+                    return { note: merged, created: false, persisted: persistSavedNotes() };
                 }
 
                 savedNotes.unshift(note);
                 savedNotes = savedNotes.slice(0, 80);
-                persistSavedNotes();
-                return { note, created: true };
+                return { note, created: true, persisted: persistSavedNotes() };
             }
 
             function getSavedNoteById(noteId) {
@@ -7660,6 +7884,7 @@
                 const notes = [];
                 let createdCount = 0;
                 let skippedCount = 0;
+                let persistFailed = false;
 
                 collected.items.forEach(itemText => {
                     const note = buildSavedNoteFromItem(itemText, meta);
@@ -7667,13 +7892,21 @@
                     const result = upsertSavedNote(note);
                     if (!result.note) return;
                     notes.push(result.note);
+                    if (result.persisted === false) persistFailed = true;
                     if (result.created) createdCount += 1;
                     else skippedCount += 1;
                 });
 
                 if (!notes.length) return null;
 
-                renderMemoPanel(noteSearchInput ? noteSearchInput.value : '');
+                if (persistFailed) {
+                    showToast('笔记暂时没写进本地，刷新后可能丢失');
+                }
+                if (activeMemoTag !== 'all' && activeMemoTag !== 'starred' && notes.some(note => note.tag !== activeMemoTag)) {
+                    setActiveMemoTag('all');
+                } else {
+                    renderMemoPanel(noteSearchInput ? noteSearchInput.value : '');
+                }
                 syncAllKnowledgeSaveButtons();
                 if (isCompactViewport()) {
                     showMobilePanel('left');
@@ -7690,21 +7923,28 @@
 
             function saveKnowledgeMethodologyFromMessage(messageEl, options = {}) {
                 const content = (messageEl && messageEl.dataset.aiContent) || '';
-                if (!content.trim()) {
+                const itemText = String(options.itemText || '').trim();
+                if (!content.trim() && !itemText) {
                     showToast('这条回复没有可保存的内容');
                     return null;
                 }
-                const result = saveAiContentToNotes(content, {
-                    itemText: options.itemText || '',
-                    items: options.items || [],
-                    sourceQuestion: findSourceQuestionNearMessage(messageEl)
-                });
+                let result = null;
+                try {
+                    result = saveAiContentToNotes(content || itemText, {
+                        itemText,
+                        items: options.items || [],
+                        sourceQuestion: findSourceQuestionNearMessage(messageEl)
+                    });
+                } catch (error) {
+                    showToast('存入笔记失败，请再试一次');
+                    return null;
+                }
                 if (!result) {
-                    showToast('这次回复里还没有知识点或方法论原文，暂时无法存入笔记');
+                    showToast('这条还不是能单独存的教学要点');
                     return null;
                 }
                 const savedItems = (result.notes || []).map(item => item.rawContent);
-                markKnowledgeButtonsSaved(messageEl, options.itemText ? [options.itemText] : savedItems);
+                markKnowledgeButtonsSaved(messageEl, itemText ? [itemText] : savedItems);
                 if (options.button) {
                     markSaveNoteButtonSaved(options.button);
                 }
@@ -8198,11 +8438,21 @@
 
             function isBlankFollowup(text) {
                 const source = String(text || '').trim();
-                if (!source || source.length > 24) return false;
+                if (!source || source.length > 80) return false;
                 if (/^(?:那|然后|接着|还有|再看|继续|再讲|那再看|那再讲)?\s*(?:第\s*)?[（(]?\s*\d{1,3}\s*[)）]?\s*(?:空|题|小题)?\s*[。.?？!！～~]*$/.test(source)) {
                     return true;
                 }
-                return /^(?:可以|请|帮我|麻烦)?(?:详细)?(?:给)?(?:我)?(?:讲|讲解|分析|看看|看下)(?:一下)?\s*(?:第\s*)?\d{1,3}\s*(?:空|题|小题)?[吗么嘛]?[。.?？!！～~]*$/.test(source);
+                if (/^(?:那|然后|接着|还有|再看|继续|再讲)?\s*(?:下一空|上一空|下一题|上一题|下空|上空)\s*[。.?？!！～~]*$/.test(source)) {
+                    return true;
+                }
+                if (/^(?:可以|请|帮我|麻烦)?(?:详细)?(?:给)?(?:我)?(?:讲|讲解|分析|看看|看下)(?:一下)?\s*(?:第\s*)?\d{1,3}\s*(?:空|题|小题)?[吗么嘛]?[。.?？!！～~]*$/.test(source)) {
+                    return true;
+                }
+                if (source.length <= 24) return false;
+                if (/_{2,}/.test(source) || /A[.．、]\s*\S[\s\S]{0,80}B[.．、]\s*\S[\s\S]{0,80}C[.．、]\s*\S/.test(source)) return false;
+                const words = source.match(/[A-Za-z]{3,}/g) || [];
+                if (words.length > 12) return false;
+                return /(?:第\s*\d{1,3}\s*[空题小题]|上[一]?[空题]|下[一]?[空题]|这[一]?[空题]).{0,40}?(?:为什么|为何|再讲|怎么|如何|可以|不行|不能|不选|不是|不对)|(?:为什么|为何|再讲一下|怎么选|怎么填).{0,24}?(?:第\s*\d{1,3}\s*[空题小题]|这[一]?空)/.test(source);
             }
 
             async function getLastChatImagePayload() {
