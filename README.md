@@ -5,7 +5,7 @@
 - 前端：`demotrial.html`
 - 后端：`FastAPI`
 - 接口：`POST /api/chat`
-- 模型接入框架：`Qwen 文本 / 视觉 / OCR`
+- 模型接入：`AI Ping`（OpenAI 兼容接口）
 
 ## 启动方式
 
@@ -29,21 +29,21 @@ python -m venv .venv
 Copy-Item .env.example .env
 ```
 
-当前已预留这些模型：
+当前模型：
 
-- 视觉模型：`qwen3-vl-flash`
-- 纯 OCR 模型：`qwen-vl-ocr-latest`
-- 文本模型：`qwen-flash`
-- 文本增强模型：`qwen-plus`
+- 文本模型：`DeepSeek-V4-Pro`
+- 文本备用：`DeepSeek-V3.2`
+- 视觉模型：`GLM-4.6V`
+- 识图 OCR：`DeepSeek-OCR`
 
 主要环境变量：
 
-- `QWEN_API_KEY`
-- `QWEN_BASE_URL`
-- `QWEN_TEXT_MODEL`
-- `QWEN_BACKUP_TEXT_MODEL`
-- `QWEN_VISION_MODEL`
-- `QWEN_OCR_MODEL`
+- `AIPING_API_KEY`
+- `AIPING_BASE_URL`（`https://aiping.cn/api/v1`）
+- `AIPING_TEXT_MODEL`
+- `AIPING_BACKUP_TEXT_MODEL`
+- `AIPING_VISION_MODEL`
+- `AIPING_OCR_MODEL`
 
 4. 启动服务
 
@@ -69,9 +69,9 @@ Copy-Item .env.example .env
     { "sender": "user", "content": "你好" },
     { "sender": "ai", "content": "你好呀" }
   ],
-  "preferred_text_model": "qwen-flash",
-  "preferred_vision_model": "qwen3-vl-flash",
-  "preferred_ocr_model": "qwen-vl-ocr-latest",
+  "preferred_text_model": "DeepSeek-V4-Pro",
+  "preferred_vision_model": "GLM-4.6V",
+  "preferred_ocr_model": "DeepSeek-OCR",
   "use_ocr_first": true
 }
 ```
@@ -83,8 +83,8 @@ Copy-Item .env.example .env
   "reply": "这道题我们可以按题干定位来拆解。",
   "meta": {
     "route": "text",
-    "provider": "dashscope-compatible",
-    "text_model": "qwen-flash",
+    "provider": "aiping",
+    "text_model": "DeepSeek-V4-Pro",
     "vision_model": null,
     "ocr_model": null,
     "used_demo_fallback": false
@@ -94,8 +94,8 @@ Copy-Item .env.example .env
 
 ## 当前模型路由
 
-- 纯文本问题：走 `qwen-flash`
-- 图片问题：默认先走 `qwen-vl-ocr-latest`，再把 OCR 结果和图片一起交给 `qwen3-vl-flash`
+- 纯文本问题：走 `DeepSeek-V4-Pro`
+- 图片问题：默认先走 `DeepSeek-OCR`，再把 OCR 结果和图片一起交给 `GLM-4.6V`
 - 如果没配置 API Key，或者模型调用失败：自动回退到当前 demo 回复逻辑
 
 ## 额外接口
@@ -122,12 +122,12 @@ Vercel 会直接识别根目录的 `app.py` 作为 FastAPI 入口。
 
 在 Vercel Project Settings -> Environment Variables 中填写：
 
-- `QWEN_API_KEY`
-- `QWEN_BASE_URL`
-- `QWEN_TEXT_MODEL`
-- `QWEN_BACKUP_TEXT_MODEL`
-- `QWEN_VISION_MODEL`
-- `QWEN_OCR_MODEL`
+- `AIPING_API_KEY`
+- `AIPING_BASE_URL`
+- `AIPING_TEXT_MODEL`
+- `AIPING_BACKUP_TEXT_MODEL`
+- `AIPING_VISION_MODEL`
+- `AIPING_OCR_MODEL`
 
 建议值与本地 `.env` 保持一致。
 

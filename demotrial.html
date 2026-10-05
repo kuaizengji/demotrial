@@ -9,6 +9,13 @@
     <script>
         tailwind.config = {
             theme: {
+                screens: {
+                    sm: '640px',
+                    md: '768px',
+                    lg: '1280px',
+                    xl: '1536px',
+                    '2xl': '1536px',
+                },
                 extend: {
                     colors: {
                         brand: '#7d92b2',
@@ -1599,6 +1606,14 @@
         .chat-structured-answer {
             background: linear-gradient(180deg, rgba(234, 240, 247, 0.95) 0%, rgba(245, 247, 250, 0.95) 100%);
         }
+        .chat-answer-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.35rem;
+        }
+        .chat-answer-head .chat-structured-label { margin-bottom: 0; }
         .chat-structured-answer-main {
             font-size: 1.05em;
             font-weight: 800;
@@ -1747,6 +1762,26 @@
         .chat-structured-step-focus {
             font-weight: 700;
             color: #5d7188;
+        }
+        .chat-structured-step-answer {
+            margin-left: auto;
+            max-width: 58%;
+            overflow-wrap: anywhere;
+            font-weight: 800;
+            color: #3d5d86;
+            background: rgba(226, 236, 248, 0.95);
+            border-radius: 999px;
+            padding: 0.12rem 0.55rem;
+            font-size: 0.82em;
+            line-height: 1.45;
+        }
+        .chat-structured-step-body p {
+            margin: 0.22rem 0 0;
+            line-height: 1.65;
+            color: #4d6278;
+        }
+        .chat-structured-step-body p:first-child {
+            margin-top: 0.2rem;
         }
         .chat-structured-step-line + .chat-structured-step-line {
             margin-top: 0.26rem;
@@ -2255,9 +2290,10 @@
             bottom: calc(1.25rem + env(safe-area-inset-bottom));
         }
 
-        @media (max-width: 1023px) {
+        @media (max-width: 1279px) {
             body {
                 height: var(--app-height, 100dvh) !important;
+                transform: translateY(var(--vv-offset, 0px));
             }
             main {
                 gap: 0.5rem !important;
@@ -2425,7 +2461,17 @@
             }
         }
 
-        @media (min-width: 1024px) {
+        @media (max-width: 420px) {
+            #share-btn { display: none; }
+            #timer-text { display: none; }
+            .app-header {
+                padding-left: 0.7rem;
+                padding-right: 0.7rem;
+            }
+            #history-btn span { display: none; }
+        }
+
+        @media (min-width: 1280px) {
             #left-panel.mobile-collapse,
             #right-panel.mobile-collapse {
                 max-height: none;
@@ -2655,8 +2701,14 @@
         body.night-mode .chat-structured-text {
             color: #eef3fa !important;
         }
-        body.night-mode .chat-structured-label {
-            color: #b7c6da !important;
+        body.night-mode .chat-structured-label,
+        body.night-mode .chat-structured-step-focus,
+        body.night-mode .chat-structured-step-body p {
+            color: #d5e0ee !important;
+        }
+        body.night-mode .chat-structured-step-answer {
+            color: #f4f8fd !important;
+            background: #3d5a82 !important;
         }
         body.night-mode .chat-structured-choice-key {
             background: #3d5a82 !important;
@@ -3396,7 +3448,7 @@
 
         <!-- 右栏 -->
         <aside id="right-panel" class="w-full lg:w-[25%] flex-shrink-0 order-3 lg:order-3 glass-panel rounded-[24px] shadow-md p-3 sm:p-4 md:p-5 h-full flex flex-col mobile-collapse lg:max-h-none lg:opacity-100 lg:overflow-visible border border-white/60 transition-all duration-300">
-            <div class="sidebar-content flex flex-col h-full">
+            <div class="sidebar-content flex flex-col h-full min-h-0">
                 <div class="flex items-center justify-between mb-3 sm:mb-4">
                     <h2 class="text-base sm:text-lg font-bold text-brand flex items-center gap-2"><i class="fa-solid fa-puzzle-piece text-sm"></i> 拓 展</h2>
                     <div class="flex items-center gap-1.5">
@@ -3844,7 +3896,7 @@
             let isSending = false;
             let pendingImage = null;
             let pendingAiIndicator = null;
-            let currentViewportMode = window.innerWidth < 1024 ? 'mobile' : 'desktop';
+            let currentViewportMode = window.innerWidth < 1280 ? 'mobile' : 'desktop';
             let profileDraftAvatar = '';
             let selectedNoteId = NOTE_FLASHCARDS[0].id;
             let flashcardIndex = 0;
@@ -4212,6 +4264,12 @@
 
             function salvageThinkingSentence(item) {
                 let text = String(item || '').replace(/[ \t]{2,}/g, ' ').replace(/^[ \t：:、.\-]+|[ \t：:、.\-]+$/g, '').trim();
+                text = text.replace(/^在思考中[，,]\s*/, '');
+                const leak = text.search(/留空字符串|在代码中|在输出中|确保覆盖|空字符串|语言严肃简练|知识方法论\s*[:：]|方法论\s*[:：]|从提取\s*[:：]|但要简洁|现在[，,]\s*(?:确认|确保)|首先[，,]\s*supported|supported\s*[:：]\s*(?:true|false)|只有题干里真的出现|不能编造|用中文讲解|focus\s*写|用户误说|所以[，,]?\s*题型是|没有指定空号|确认字段|写成字符串|可操作的判断|有点短|answer\s*字段|注意\s*[:：]\s*用户说|但要\s*3|在\s*conclusion|在示例中|或留空|为了安全|\}\s*,?\s*\}|"\s*[A-G]\s*"\s*[:：]/i);
+                if (leak >= 0) {
+                    text = text.slice(0, leak).replace(/(?:现在|接下来|然后)[，,]?\s*$/g, '').replace(/[，,。；;\"'“”\s]+$/g, '').trim();
+                    if ((text.match(/[\u4e00-\u9fff]/g) || []).length < 12) return '';
+                }
                 if (!text || /^\s*[{[]/.test(text) || /^"[a-z_]+"\s*:/.test(text)) return '';
                 if (/(?:现在|接下来|然后|最后|下面)(?:开始)?(?:构造|组装|生成|输出|填写|按照)\s*(?:这个|最终|固定|以下)?\s*(?:JSON|json|字段|格式)|思考结束后|正式回答只输出|输出一个\s*JSON|现在[，,]根据要求|现在我需要按照要求|现在[，,]\s*(?:输出|写)\s*(?:JSON|json)?/i.test(text)
                     && !/空\s*[（(]?\d|第\s*\d+\s*空/.test(text)) {
@@ -4502,13 +4560,79 @@
                 return [];
             }
 
+            function visibleReasoningSteps(data) {
+                const steps = Array.isArray(data && data.reasoningSteps) ? data.reasoningSteps : [];
+                return steps.filter(step => {
+                    const sentence = joinReasoningSentence(step);
+                    return sentence && !/^(本题考查|这是一道|判断题型|调用方法)/.test(sentence);
+                });
+            }
+
+            function displayBlankLabel(focus, index, questionType) {
+                const text = String(focus || '').trim();
+                const unit = questionType === '阅读' ? '题' : '空';
+                const bare = text.match(/^(\d{1,2})\b/);
+                if (bare && text.length <= 4) return `第${Number(bare[1])}${unit}`;
+                const named = text.match(/(?:空|第)\s*(\d{1,2})/);
+                if (named) return `第${Number(named[1])}${unit}`;
+                return text || `第${index + 1}步`;
+            }
+
+            function basisDisplayLines(basis) {
+                const lines = String(basis || '')
+                    .split(/(?<=[。；;])/)
+                    .map(item => item.trim())
+                    .filter(Boolean);
+                return lines.length ? lines : [];
+            }
+
+            function renderReasoningStepsHtml(data) {
+                const steps = visibleReasoningSteps(data);
+                if (!steps.length) return '';
+                const cards = steps.map((step, index) => {
+                    const label = displayBlankLabel(step && step.focus, index, data && data.questionType);
+                    const conclusion = String(step && step.conclusion || '').trim();
+                    const cjk = (conclusion.match(/[\u4e00-\u9fff]/g) || []).length;
+                    const chipText = conclusion && conclusion.length <= 28 && cjk <= 8 ? conclusion : '';
+                    const lines = basisDisplayLines(step && step.basis);
+                    if (conclusion && !chipText && conclusion !== lines[lines.length - 1]) lines.push(conclusion);
+                    const body = lines.map(line => `<p>${renderPlainText(line)}</p>`).join('');
+                    const chip = chipText
+                        ? `<span class="chat-structured-step-answer">${escapeHtml(chipText)}</span>`
+                        : '';
+                    return `
+                        <article class="chat-structured-step">
+                            <div class="chat-structured-step-head">
+                                <span class="chat-structured-step-index">${index + 1}</span>
+                                <span class="chat-structured-step-focus">${escapeHtml(label)}</span>
+                                ${chip}
+                            </div>
+                            <div class="chat-structured-step-body">${body}</div>
+                        </article>
+                    `;
+                }).join('');
+                return `<div class="chat-structured-steps">${cards}</div>`;
+            }
+
+            function stepBlankNums(step) {
+                const focus = String(step && step.focus || '');
+                const nums = blankNumsInText(focus);
+                const bare = focus.trim().match(/^(\d{1,2})\b/);
+                if (bare) {
+                    const value = Number(bare[1]);
+                    if (value >= 1 && value <= 70) nums.add(value);
+                }
+                if (nums.size) return nums;
+                return blankNumsInText([focus, step && step.basis, step && step.conclusion].join(' '));
+            }
+
             function blankNumsInText(text) {
                 const nums = new Set();
                 const re = /(?:空\s*|第\s*)(\d{1,2})(?:\s*空)?|\(\s*(\d{1,2})\s*\)/g;
                 let match;
                 while ((match = re.exec(String(text || '')))) {
                     const value = Number(match[1] || match[2]);
-                    if (value >= 1 && value <= 20) nums.add(value);
+                    if (value >= 1 && value <= 70) nums.add(value);
                 }
                 return nums;
             }
@@ -4579,7 +4703,7 @@
                 const steps = Array.isArray(data.reasoningSteps) ? data.reasoningSteps.slice() : [];
                 const covered = new Set();
                 steps.forEach(step => {
-                    blankNumsInText([step && step.focus, step && step.basis, step && step.conclusion].join(' ')).forEach(num => covered.add(num));
+                    stepBlankNums(step).forEach(num => covered.add(num));
                 });
                 const thinkNums = new Set();
                 blocks.forEach(block => blankNumsInText(block.focus).forEach(num => thinkNums.add(num)));
@@ -4656,11 +4780,40 @@
                 if (words.length >= 8 && raw.length > 80) return false;
                 const compact = raw.replace(/[\s,，。．.；;:：、·\-—–“”"'（）()]+/g, '');
                 if (compact.length < 8) return false;
-                return /如果|若|当|则|复现|概括|态度|起承转合|核心|定位|同义|主旨|套路|主动|被动|谓语|非谓语|冠词|从句|转折|因果|正负|动作链|一致|匹配|需|发音|时态|比较|单数|复数|介词|动名词|不定式|常识|原文没有|关系副词|where|which|when|：|:|→|->/i.test(raw);
+                return /如果|若|当|则|复现|概括|态度|起承转合|核心|定位|同义|主旨|套路|主动|被动|谓语|非谓语|冠词|从句|转折|因果|正负|动作链|一致|匹配|需|发音|时态|比较|单数|复数|介词|动名词|不定式|常识|原文没有|关系副词|完成时|进行时|标志|where|which|when|指代|建议|益处|原因|逻辑|衔接|代词|：|:|→|->/i.test(raw);
+            }
+
+            function isSaveableTeachingLine(text) {
+                const raw = String(text || '').trim();
+                if (!raw || raw.length < 8 || raw.length > 280) return false;
+                if (/^(?:答案|answer)\s*[:：]/.test(raw)) return false;
+                if (/^(?:第\s*)?\d+\s*[.．、]\s*[A-D]\b/.test(raw)) return false;
+                if (/(与语句理解|理解能力相关|与理解有关|需要结合语境|结合上下文判断|具体问题具体分析)/.test(raw)) return false;
+                if (/^考查[^，。；]{0,12}$/.test(raw)) return false;
+                const words = raw.match(/[A-Za-z]{2,}/g) || [];
+                const cjk = (raw.match(/[\u4e00-\u9fff]/g) || []).length;
+                if (cjk < 6) return false;
+                if (words.length >= 14 && cjk < 12) return false;
+                if (looksLikeMethodRule(raw)) return true;
+                return /所以|因此|用|填|选|排除|冲突|改成|改为|不能|不要|应该/.test(raw);
             }
 
             function isUsefulKnowledgeLine(text) {
-                return looksLikeMethodRule(text);
+                return isSaveableTeachingLine(text);
+            }
+
+            function linesFromReasoningSteps(data) {
+                const steps = Array.isArray(data && data.reasoningSteps) ? data.reasoningSteps : [];
+                const lines = [];
+                steps.forEach(step => {
+                    const basis = String(step && step.basis || '').trim();
+                    if (!isSaveableTeachingLine(basis)) return;
+                    const focus = String(step && step.focus || '').trim();
+                    const line = focus && basis.indexOf(focus) !== 0 ? `${focus}：${basis}` : basis;
+                    if (lines.some(existing => existing === line || existing.includes(basis) || basis.includes(existing))) return;
+                    lines.push(line);
+                });
+                return lines.slice(0, 3);
             }
 
             function splitKnowledgeCandidateLines(text) {
@@ -4719,6 +4872,9 @@
                 const merged = mergeKnowledgeLines([...primary, ...teaching, ...followRule]);
                 if (merged.length) return merged.slice(0, 4);
 
+                const fromSteps = linesFromReasoningSteps(data);
+                if (fromSteps.length) return fromSteps;
+
                 const cards = mergeKnowledgeLines(data.knowledgeCards)
                     .filter(item => isUsefulKnowledgeLine(item) && (item.length >= 12 || /[。；：]/.test(item)));
                 return cards.slice(0, 3);
@@ -4732,6 +4888,22 @@
                     ? [data.followUp, data.stemUnderstanding, data.answer].filter(Boolean).join('\n')
                     : String(content || '');
                 return extractTeachingPointLines(fallbackText || String(content || ''));
+            }
+
+            function buildLessonNoteText(data) {
+                if (!data || data.supported === false) return '';
+                const answer = String(data.answer || '').trim();
+                if (!answer || answer === '需要确认' || data.needMoreContext) return '';
+                const lines = getStructuredExplanationLines(data, 4);
+                if (!lines.length) return '';
+                return `答案：${answer}\n${lines.join('\n')}`.trim();
+            }
+
+            function lessonSaveButtonHtml(data) {
+                const text = buildLessonNoteText(data);
+                if (!text) return '';
+                const already = isKnowledgeItemSaved(text);
+                return `<button type="button" class="chat-save-note-btn${already ? ' is-saved' : ''}" data-save-lesson-btn title="${already ? '这题讲解已在笔记中' : '把这题的答案和讲解存入笔记'}">${already ? '<i class="fa-solid fa-check"></i><span>已存入</span>' : '<i class="fa-regular fa-bookmark"></i><span>存这题</span>'}</button>`;
             }
 
             function getVisibleFollowUp(data) {
@@ -4796,8 +4968,16 @@
                 if (data.questionType) metaParts.push(sanitizeStructuredMeta(data.questionType));
                 if (data.subtype) metaParts.push(sanitizeStructuredMeta(data.subtype));
                 if (data.needMoreContext) metaParts.push('需要补充题干');
-                const explanationLines = getStructuredExplanationLines(data);
-                const explanationHtml = explanationLines.length
+                const stepHtml = renderReasoningStepsHtml(data);
+                const explanationLines = stepHtml ? [] : getStructuredExplanationLines(data);
+                const explanationHtml = stepHtml
+                    ? `
+                        <div class="chat-structured-card">
+                            <span class="chat-structured-label">具体讲解</span>
+                            ${stepHtml}
+                        </div>
+                    `
+                    : explanationLines.length
                     ? `
                         <div class="chat-structured-card">
                             <span class="chat-structured-label">具体讲解</span>
@@ -4826,7 +5006,10 @@
                 const answerHtml = (data.answer || data.unsupportedReason)
                     ? `
                         <div class="chat-structured-answer">
-                            <span class="chat-structured-label">${data.supported ? '答案' : '结果'}</span>
+                            <div class="chat-answer-head">
+                                <span class="chat-structured-label">${data.supported ? '答案' : '结果'}</span>
+                                ${data.supported ? lessonSaveButtonHtml(data) : ''}
+                            </div>
                             <div class="chat-structured-answer-main">${formatStructuredParagraphs(getStructuredAnswerLines(data))}</div>
                             ${data.needMoreContext ? '<div class="chat-structured-answer-note">当前信息还不够，建议补充完整题干、空格位置或选项。</div>' : ''}
                         </div>
@@ -5002,23 +5185,34 @@
 
                 const animatedFields = [];
 
-                const explanationLines = getStructuredExplanationLines(data);
-                if (explanationLines.length) {
+                const stepHtml = renderReasoningStepsHtml(data);
+                if (stepHtml) {
                     const card = document.createElement('div');
                     card.className = 'chat-structured-card';
-                    card.innerHTML = '<span class="chat-structured-label">具体讲解</span><div class="chat-structured-text"></div>';
+                    card.innerHTML = `<span class="chat-structured-label">具体讲解</span>${stepHtml}`;
                     wrapper.appendChild(card);
-                    animatedFields.push({
-                        element: card.querySelector('.chat-structured-text'),
-                        text: explanationLines.join('\n\n')
-                    });
+                } else {
+                    const explanationLines = getStructuredExplanationLines(data);
+                    if (explanationLines.length) {
+                        const card = document.createElement('div');
+                        card.className = 'chat-structured-card';
+                        card.innerHTML = '<span class="chat-structured-label">具体讲解</span><div class="chat-structured-text"></div>';
+                        wrapper.appendChild(card);
+                        animatedFields.push({
+                            element: card.querySelector('.chat-structured-text'),
+                            text: explanationLines.join('\n\n')
+                        });
+                    }
                 }
 
                 if (data.answer || data.unsupportedReason) {
                     const answer = document.createElement('div');
                     answer.className = 'chat-structured-answer';
                     answer.innerHTML = `
-                        <span class="chat-structured-label">${data.supported ? '答案' : '结果'}</span>
+                        <div class="chat-answer-head">
+                            <span class="chat-structured-label">${data.supported ? '答案' : '结果'}</span>
+                            ${data.supported ? lessonSaveButtonHtml(data) : ''}
+                        </div>
                         <div class="chat-structured-answer-main"></div>
                         ${data.needMoreContext ? '<div class="chat-structured-answer-note">当前信息还不够，建议补充完整题干、空格位置或选项。</div>' : ''}
                     `;
@@ -6804,6 +6998,24 @@
                     return;
                 }
 
+                const lessonBtn = event.target.closest('[data-save-lesson-btn]');
+                if (lessonBtn && chatWindow.contains(lessonBtn)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const messageEl = lessonBtn.closest('.message-animate');
+                    const structured = parseStructuredReply((messageEl && messageEl.dataset.aiContent) || '');
+                    const itemText = buildLessonNoteText(structured);
+                    const note = saveKnowledgeMethodologyFromMessage(messageEl, {
+                        itemText,
+                        title: trimTitleLength(`${(structured && structured.questionType) || '讲题'} · ${(structured && structured.answer) || '这题'}`, 22),
+                        button: lessonBtn
+                    });
+                    if (note) {
+                        showToast(note.createdCount > 0 ? '这题讲解已存入笔记' : '这题讲解已在笔记中');
+                    }
+                    return;
+                }
+
                 const saveBtn = event.target.closest('[data-save-note-btn]');
                 if (saveBtn && chatWindow.contains(saveBtn)) {
                     event.preventDefault();
@@ -7672,7 +7884,8 @@
                 const questionType = sanitizeStructuredMeta(meta.questionType || '').trim() || '讲题';
                 const subtype = sanitizeStructuredMeta(meta.subtype || '').trim();
                 const cleanedQuestion = resolveFlashcardSourceQuestion(meta.sourceQuestion || '');
-                const title = trimTitleLength(rawContent.split(/[，。；：]/)[0], 22)
+                const title = meta.title
+                    || trimTitleLength(rawContent.split(/[，。；：]/)[0], 22)
                     || summarizeQuestionTitle(cleanedQuestion, meta.structured || null, 22)
                     || `${questionType}${subtype ? ` · ${subtype}` : ''}`
                     || '知识点笔记';
@@ -7759,6 +7972,11 @@
                 const bulkBtn = messageEl.querySelector('[data-save-note-btn]');
                 if (bulkBtn && items.every(item => isKnowledgeItemSaved(item))) {
                     markSaveNoteButtonSaved(bulkBtn);
+                }
+                const lessonBtn = messageEl.querySelector('[data-save-lesson-btn]');
+                const lessonText = buildLessonNoteText(structured);
+                if (lessonBtn && lessonText && isKnowledgeItemSaved(lessonText)) {
+                    markSaveNoteButtonSaved(lessonBtn);
                 }
             }
 
@@ -7878,6 +8096,7 @@
                     questionType: structured ? structured.questionType : '',
                     subtype: structured ? structured.subtype : '',
                     sourceQuestion: collected.sourceQuestion,
+                    title: options.title || '',
                     structured
                 };
 
@@ -7909,7 +8128,7 @@
                 }
                 syncAllKnowledgeSaveButtons();
                 if (isCompactViewport()) {
-                    showMobilePanel('left');
+                    openMobilePanel('left');
                 }
 
                 return {
@@ -7933,6 +8152,7 @@
                     result = saveAiContentToNotes(content || itemText, {
                         itemText,
                         items: options.items || [],
+                        title: options.title || '',
                         sourceQuestion: findSourceQuestionNearMessage(messageEl)
                     });
                 } catch (error) {
@@ -8322,7 +8542,7 @@
                     return;
                 }
                 if (isCompactViewport()) {
-                    showMobilePanel('left');
+                    openMobilePanel('left');
                 }
                 setSelectedNote(note.id, { scrollIntoView: true });
                 showToast(`已定位到：${note.title}`);
@@ -8335,7 +8555,7 @@
             }
 
             function isCompactViewport() {
-                return window.innerWidth < 1024;
+                return window.innerWidth < 1280;
             }
 
             function setMobileToggleState(activePanel) {
@@ -8343,8 +8563,25 @@
                 mobileToggleRight.classList.toggle('active', activePanel === 'right');
             }
 
+            function openMobilePanel(panel) {
+                if (!isCompactViewport()) return;
+                if (panel) closeHistoryPanel();
+                if (panel === 'left') {
+                    rightPanel.classList.remove('open');
+                    leftPanel.classList.add('open');
+                    setMobileToggleState('left');
+                    setMobileDrawerOverlay(true);
+                } else if (panel === 'right') {
+                    leftPanel.classList.remove('open');
+                    rightPanel.classList.add('open');
+                    setMobileToggleState('right');
+                    setMobileDrawerOverlay(true);
+                }
+            }
+
             function showMobilePanel(panel) {
                 if (!isCompactViewport()) return;
+                if (panel) closeHistoryPanel();
                 if (panel === 'left') {
                     if (leftPanel.classList.contains('open')) {
                         leftPanel.classList.remove('open');
@@ -8918,10 +9155,26 @@
             });
             if (window.visualViewport) {
                 const syncAppHeight = () => {
-                    document.documentElement.style.setProperty('--app-height', `${window.visualViewport.height}px`);
+                    const viewport = window.visualViewport;
+                    document.documentElement.style.setProperty('--app-height', `${Math.round(viewport.height)}px`);
+                    const offset = isCompactViewport() ? Math.max(0, Math.round(viewport.offsetTop)) : 0;
+                    document.documentElement.style.setProperty('--vv-offset', `${offset}px`);
                 };
                 window.visualViewport.addEventListener('resize', syncAppHeight);
+                window.visualViewport.addEventListener('scroll', syncAppHeight);
                 syncAppHeight();
+            }
+            if (chatInput) {
+                chatInput.addEventListener('focus', () => {
+                    if (!isCompactViewport()) return;
+                    window.setTimeout(() => {
+                        if (window.visualViewport) {
+                            document.documentElement.style.setProperty('--app-height', `${Math.round(window.visualViewport.height)}px`);
+                        }
+                        const wrap = document.querySelector('.chat-composer-wrap');
+                        if (wrap && wrap.scrollIntoView) wrap.scrollIntoView({ block: 'nearest' });
+                    }, 280);
+                });
             }
             mobileToggleLeft.addEventListener('click', () => {
                 if (isCompactViewport()) showMobilePanel('left');

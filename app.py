@@ -72,29 +72,44 @@ class ChatResponse(BaseModel):
     ocr_stem: str | None = None
 
 
+AIPING_BASE_URL = "https://aiping.cn/api/v1"
+
+
 class ModelSettings(BaseModel):
-    provider_name: str = "dashscope-compatible"
+    provider_name: str = "aiping"
     api_key: str | None = None
-    base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    text_model: str = "qwen-flash"
-    backup_text_model: str = "qwen-plus"
-    vision_model: str = "qwen3-vl-flash"
-    ocr_model: str = "qwen-vl-ocr-latest"
+    base_url: str = AIPING_BASE_URL
+    text_model: str = "DeepSeek-V4-Pro"
+    backup_text_model: str = "DeepSeek-V3.2"
+    vision_model: str = "GLM-4.6V"
+    ocr_model: str = "DeepSeek-OCR"
 
     @property
     def enabled(self) -> bool:
         return bool(self.api_key)
 
 
+def _env_value(*names: str, default: str | None = None) -> str | None:
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return default
+
+
 @lru_cache(maxsize=1)
 def get_model_settings() -> ModelSettings:
+    base_url = _env_value("AIPING_BASE_URL", "QWEN_BASE_URL", default=AIPING_BASE_URL) or AIPING_BASE_URL
+    provider_name = "aiping" if "aiping.cn" in base_url else "openai-compatible"
     return ModelSettings(
-        api_key=os.getenv("DASHSCOPE_API_KEY") or os.getenv("QWEN_API_KEY") or os.getenv("OPENAI_API_KEY"),
-        base_url=os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-        text_model=os.getenv("QWEN_TEXT_MODEL", "qwen-flash"),
-        backup_text_model=os.getenv("QWEN_BACKUP_TEXT_MODEL", "qwen-plus"),
-        vision_model=os.getenv("QWEN_VISION_MODEL", "qwen3-vl-flash"),
-        ocr_model=os.getenv("QWEN_OCR_MODEL", "qwen-vl-ocr-latest"),
+        provider_name=provider_name,
+        api_key=_env_value("AIPING_API_KEY", "DASHSCOPE_API_KEY", "QWEN_API_KEY", "OPENAI_API_KEY"),
+        base_url=base_url,
+        text_model=_env_value("AIPING_TEXT_MODEL", "QWEN_TEXT_MODEL", default="DeepSeek-V4-Pro") or "DeepSeek-V4-Pro",
+        backup_text_model=_env_value("AIPING_BACKUP_TEXT_MODEL", "QWEN_BACKUP_TEXT_MODEL", default="DeepSeek-V3.2")
+        or "DeepSeek-V3.2",
+        vision_model=_env_value("AIPING_VISION_MODEL", "QWEN_VISION_MODEL", default="GLM-4.6V") or "GLM-4.6V",
+        ocr_model=_env_value("AIPING_OCR_MODEL", "QWEN_OCR_MODEL", default="DeepSeek-OCR") or "DeepSeek-OCR",
     )
 
 
@@ -106,14 +121,76 @@ def get_openai_client() -> OpenAI | None:
     return OpenAI(api_key=settings.api_key, base_url=settings.base_url)
 
 
-def get_teaching_prompt() -> str:
-    if PROMPT_FILE.exists():
-        return PROMPT_FILE.read_text(encoding="utf-8").strip()
-    logger.warning("Teaching prompt file not found: %s", PROMPT_FILE)
-    return (
-        "你是陶然，高考英语老师。讲题、答疑、陪学生练英语。听懂用户在说什么，再自然作答。"
-        "阅读、完形、语法、七选五都直接讲。有材料就给答案和依据；材料不够就说明还缺什么。不要说“不支持这种题”。"
+PROMPT_BLOCK_RE = re.compile(r"<!--\s*block:\s*([^\s>]+)\s*-->")
+KNOWN_QUESTION_TYPES = ("语法", "完型", "阅读", "七选五", "改错", "翻译", "词汇", "长难句", "综合")
+QUESTION_TYPE_PATTERN = "七选五|长难句|完型|完形|词汇|语法|阅读|改错|翻译|综合"
+SOURCE_WORD_STOP = {
+    "the", "and", "for", "that", "with", "from", "this", "have", "was", "were", "are",
+    "you", "your", "not", "but", "she", "her", "his", "him", "they", "them", "its",
+    "into", "over", "after", "before", "when", "what", "which", "there", "their",
+    "been", "will", "would", "could", "should", "about", "because", "than", "then",
+    "also", "just", "only", "very", "much", "more", "some", "any", "can", "did",
+    "does", "has", "had", "our", "out", "who", "how", "why", "all", "one", "two",
+    "is", "it", "of", "in", "on", "to", "as", "at", "be", "by", "or", "if", "so",
+    "we", "he", "me", "my", "an",
+}
+
+
+@lru_cache(maxsize=1)
+def prompt_blocks() -> dict[str, str]:
+    """Split prompt_1.md into task blocks. The archive block is never sent."""
+    if not PROMPT_FILE.exists():
+        logger.warning("Teaching prompt file not found: %s", PROMPT_FILE)
+        return {}
+    text = PROMPT_FILE.read_text(encoding="utf-8")
+    matches = list(PROMPT_BLOCK_RE.finditer(text))
+    blocks: dict[str, str] = {}
+    for index, match in enumerate(matches):
+        name = match.group(1).strip()
+        if name == "archive":
+            continue
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        body = text[start:end].strip()
+        if body:
+            blocks[name] = body
+    return blocks
+
+
+def prompt_block(name: str) -> str:
+    return prompt_blocks().get(name, "").strip()
+
+
+def teach_system_prompt(question_type: str) -> str:
+    """Reason stage only: one type card. The JSON contract is a later respond."""
+    card_name = question_type if question_type in KNOWN_QUESTION_TYPES else "综合"
+    parts = [
+        prompt_block("persona"),
+        prompt_block("看空"),
+        f"当前题型：{card_name}。只使用下面这一题型的判断。不要套用其他题型的规则。",
+        prompt_block(card_name) or prompt_block("综合"),
+        prompt_block("memory"),
+    ]
+    return "\n\n".join(part for part in parts if part)
+
+
+def format_system_prompt() -> str:
+    """Format stage only. No teaching rules, so the model cannot start a new essay."""
+    contract = prompt_block("output")
+    return "\n\n".join(
+        part
+        for part in (
+            contract,
+            "只把已经写好的讲稿收成一个 JSON。basis 保留三句：这一空充当什么；决定它的原词；被排除项为什么接不上。不要收成翻译，不要改成空套话。括号里有提示词时，结论必须是这个词的形式。",
+            "knowledge_methodology 写能用到下一题的判断：什么情况就填什么。不要复述这一题的情节。不要补充新情节，不要改答案。",
+        )
+        if part
     )
+
+
+def get_teaching_prompt() -> str:
+    """Kept for callers that have not classified a type yet. Still not the full archive."""
+    return teach_system_prompt("综合")
 
 
 def build_demo_reply(message: str, history: list[ChatMessage], latest_image: ImagePayload | None = None) -> str:
@@ -317,6 +394,8 @@ def deterministic_structured_reply(message: str, image_context: str | None = Non
     combined = "\n".join(part for part in (message, image_context) if part).strip()
     if looks_like_unspecified_independent_questions(combined) and not user_specified_single_target(message):
         return build_multi_question_focus_reply()
+    if is_bare_explain_request(message) and not has_enough_question_material(message, image_context):
+        return json.dumps(apply_need_material_defaults({}, message), ensure_ascii=False)
     return None
 
 
@@ -476,6 +555,8 @@ LEADING_STEM_LINE_RE = re.compile(
 )
 LEADING_OPTION_LINE_RE = re.compile(r"(?i)^[A-G][.．、\)]\s+\S")
 BLANK_NUM_RE = re.compile(r"(?:空\s*|第\s*)(\d{1,2})(?:\s*空)?|\(\s*(\d{1,2})\s*\)")
+# Gaokao English numbers cloze around 41–55 and grammar around 56–65.
+MAX_EXAM_ITEM = 70
 
 
 def has_explicit_options(*segments: str | None) -> bool:
@@ -543,6 +624,20 @@ def looks_like_grammar_fill(*segments: str | None) -> bool:
     if re.search(r"_{2,}", combined) and not looks_like_cloze_blanks(combined) and not has_explicit_options(combined):
         return True
     return False
+
+
+def looks_like_single_grammar_choice(*segments: str | None) -> bool:
+    """One blank plus A-D is a grammar choice, not a cloze passage."""
+    text = "\n".join(segment for segment in segments if segment).strip()
+    if not text or re.search(r"完形|完型|七选五|阅读理解", text):
+        return False
+    if re.search(r"语法选择|单项选择|单项填空", text):
+        return True
+    if looks_like_cloze_option_groups(text) or looks_like_cloze_blanks(text):
+        return False
+    if len(re.findall(r"_{2,}", text)) != 1 or not has_explicit_options(text):
+        return False
+    return len(re.findall(r"[.!?。]", text)) <= 3 and english_word_count(text) <= 70
 
 
 SEVEN_OPTION_RE = re.compile(r"(?m)^\s*([A-G])[\.．、\)]\s+(\S.{0,180})$")
@@ -817,9 +912,12 @@ def revise_unjustified_past_perfect(parsed: dict[str, object], message: str) -> 
         return value
 
     steps = parsed.get("reasoning_steps")
+    rewritten_blanks = {blank for _verb, blank in rewritten}
     if isinstance(steps, list):
         for step in steps:
             if not isinstance(step, dict):
+                continue
+            if not any(step_targets_blank(step, blank, steps) for blank in rewritten_blanks):
                 continue
             for key in ("focus", "basis", "conclusion"):
                 step[key] = scrub(step.get(key))
@@ -838,45 +936,23 @@ def revise_unjustified_past_perfect(parsed: dict[str, object], message: str) -> 
         ]
 
 
-def revise_complete_relative_clause(parsed: dict[str, object], message: str) -> None:
-    """Place/time + a clause that already has its object takes where/when, not which.
+def _relative_basis(place: bool) -> str:
+    if place:
+        return "空格前是地点，从句里的宾语已经齐全，不缺成分，所以填 where，不填 which。"
+    return "空格前是时间，从句已经完整，所以填 when，不填 which。"
 
-    Only the single-blank pattern is rewritten. "in which" / "on which" stays.
-    """
-    text = message or ""
-    if looks_like_cloze_blanks(text) or len(re.findall(r"_{2,}", text)) != 1:
-        return
-    place = bool(PLACE_RELATIVE_RE.search(text))
-    time_clause = bool(TIME_RELATIVE_RE.search(text))
-    if place == time_clause:
-        return
-    target = "where" if place else "when"
-    answer = str(parsed.get("answer") or "")
-    if re.search(rf"\b{target}\b", answer, flags=re.IGNORECASE):
-        return
-    if re.search(r"\b(?:in|on|at|to|for)\s+which\b", answer, flags=re.IGNORECASE):
-        return
-    if not re.search(r"\b(?:which|that|who|whom)\b", answer, flags=re.IGNORECASE):
-        return
-    parsed["answer"] = re.sub(
-        r"\b(?:which|that|who|whom)\b",
-        target,
-        answer,
-        count=1,
-        flags=re.IGNORECASE,
-    )
-    basis = (
-        "空格前是地点，从句里的宾语已经齐全，不缺成分，所以填 where，不填 which。"
-        if place
-        else "空格前是时间，从句已经完整，所以填 when，不填 which。"
-    )
+
+def _rewrite_relative_step(parsed: dict[str, object], blank: str, target: str, place: bool) -> None:
+    basis = _relative_basis(place)
     steps = parsed.get("reasoning_steps")
     if isinstance(steps, list):
         for step in steps:
             if not isinstance(step, dict):
                 continue
             blob = " ".join(str(step.get(key) or "") for key in ("focus", "basis", "conclusion"))
-            if re.search(rf"\b{target}\b", blob, flags=re.IGNORECASE):
+            if blank and not step_targets_blank(step, blank, steps):
+                continue
+            if re.search(rf"\b{target}\b", blob, flags=re.IGNORECASE) and not re.search(r"\b(?:which|that)\b", blob, flags=re.IGNORECASE):
                 continue
             if re.search(r"\b(?:which|that|who|whom)\b|关系代词", blob, flags=re.IGNORECASE):
                 step["basis"] = basis
@@ -893,10 +969,602 @@ def revise_complete_relative_clause(parsed: dict[str, object], message: str) -> 
         ]
 
 
+def revise_complete_relative_clause(parsed: dict[str, object], message: str) -> None:
+    """Place/time + a clause that already has its object takes where/when, not which.
+
+    Applies to each matching sentence, including multi-blank grammar fills.
+    "in which" / "on which" stays.
+    """
+    text = message or ""
+    if looks_like_cloze_blanks(text):
+        return
+    answer = str(parsed.get("answer") or "")
+    if re.search(r"\b(?:in|on|at|to|for)\s+which\b", answer, flags=re.IGNORECASE):
+        return
+    sentences = re.split(r"(?<=[.!?。])\s+|\n+", text)
+    changed = False
+    for sentence in sentences:
+        place = bool(PLACE_RELATIVE_RE.search(sentence))
+        time_clause = bool(TIME_RELATIVE_RE.search(sentence))
+        if place == time_clause:
+            continue
+        target = "where" if place else "when"
+        numbered = re.search(r"\(\s*(\d{1,2})\s*\)\s*_{2,}", sentence)
+        if numbered:
+            blank = numbered.group(1)
+            pattern = rf"(\(\s*{blank}\s*\)\s*)(?:which|that|who|whom)\b"
+            answer, count = re.subn(pattern, rf"\1{target}", answer, count=1, flags=re.IGNORECASE)
+            if count:
+                changed = True
+                _rewrite_relative_step(parsed, blank, target, place)
+            continue
+        if len(re.findall(r"_{2,}", text)) != 1:
+            continue
+        if re.search(rf"\b{target}\b", answer, flags=re.IGNORECASE):
+            continue
+        if not re.search(r"\b(?:which|that|who|whom)\b", answer, flags=re.IGNORECASE):
+            continue
+        answer = re.sub(r"\b(?:which|that|who|whom)\b", target, answer, count=1, flags=re.IGNORECASE)
+        changed = True
+        _rewrite_relative_step(parsed, "", target, place)
+    if changed:
+        parsed["answer"] = answer
+
+
+ARTICLE_A_SOUND = {
+    "university",
+    "uniform",
+    "useful",
+    "usual",
+    "european",
+    "one",
+    "unit",
+    "union",
+    "unique",
+    "united",
+}
+ARTICLE_AN_SOUND = {"hour", "honest", "honor", "honour", "heir"}
+ARTICLE_NOT_NOUN = {
+    "is", "are", "was", "were", "be", "been", "being", "am",
+    "has", "have", "had", "do", "does", "did", "done", "doing",
+    "will", "would", "can", "could", "may", "might", "must", "shall", "should",
+    "and", "or", "but", "nor", "so", "yet",
+    "to", "of", "in", "on", "at", "by", "for", "with", "from", "as", "than", "into", "over",
+    "that", "which", "who", "whom", "whose", "what", "when", "where", "while", "if", "because",
+    "this", "these", "those", "there", "here", "then", "also", "not", "no",
+    "said", "says", "say", "adding", "added",
+}
+CUED_HINT_RE = re.compile(
+    r"\(\s*(\d{1,2})\s*\)\s*[_.＿—–-]{2,}\s*\(\s*([A-Za-z]+)\s*\)"
+)
+UNCUE_VERBS = {
+    "feeding": r"food|bread|milk|meal|hungry",
+    "painting": r"paint|picture|brush|canvas",
+    "punishing": r"punish|punishment",
+}
+SAFE_PERCEPTION_VERBS = {"watching", "looking", "seeing", "observing", "noticing"}
+CLOZE_CHOICE_RE = re.compile(
+    r"(?:^|\n)\s*(?:\(\s*)?(\d{1,2})(?:\s*\))?\s*[.．、]\s*"
+    r"A[\.．、)\s]\s*([A-Za-z]+)\s+"
+    r"B[\.．、)\s]\s*([A-Za-z]+)\s+"
+    r"C[\.．、)\s]\s*([A-Za-z]+)\s+"
+    r"D[\.．、)\s]\s*([A-Za-z]+)",
+    re.IGNORECASE,
+)
+META_STEP_RE = re.compile(
+    r"我需要判断题型|按步骤展示解题思路|对于每个空，我需要|现在，按要求|参考答案\s*[:：]|"
+    r"我们需要|需要看用户|需要回答用户"
+)
+
+
+def expected_article(word: str) -> str:
+    token = (word or "").lower()
+    if token in ARTICLE_AN_SOUND:
+        return "an"
+    if token in ARTICLE_A_SOUND:
+        return "a"
+    if re.match(r"[aeiou]", token):
+        return "an"
+    if re.match(r"[a-z]", token):
+        return "a"
+    return ""
+
+
+def article_basis(word: str, want: str) -> str:
+    token = (word or "").lower()
+    if token in ARTICLE_AN_SOUND:
+        return f"{word} 的 h 不发音，开头是元音，冠词用 {want}。"
+    if token in ARTICLE_A_SOUND:
+        return f"{word} 开头读 /j/，按辅音选冠词，用 {want}。"
+    if want == "an":
+        return f"{word} 开头是元音音素，冠词用 an。"
+    return f"{word} 开头是辅音音素，冠词用 a。"
+
+
+def contains_word(text: str, word: str) -> bool:
+    return bool(re.search(rf"\b{re.escape(word)}\b", text or "", flags=re.IGNORECASE))
+
+
+def article_blank_pairs(text: str) -> list[tuple[str, str]]:
+    """Blanks whose next word is the noun an article would modify. A parenthetical hint is not that noun."""
+    pairs: list[tuple[str, str]] = []
+    for match in re.finditer(r"\(\s*(\d{1,2})\s*\)\s*[_.＿—–-]{2,}(?!\s*\()", text or ""):
+        word_match = re.match(r"\s*([A-Za-z]+)", (text or "")[match.end():])
+        if not word_match:
+            continue
+        word = word_match.group(1)
+        if word.lower() in ARTICLE_NOT_NOUN or expected_article(word) not in {"a", "an"}:
+            continue
+        pairs.append((match.group(1), word))
+    return pairs
+
+
+def chooses_article(text: str, article: str) -> bool:
+    return bool(
+        re.search(
+            rf"(?<!不)(?:冠词|用|填|选|改为|改成)\s*(?:为|成|了)?\s*{article}\b|(?:所以|因此)\s*{article}\b",
+            text or "",
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def article_claim_is_wrong(blob: str, word: str, want: str) -> bool:
+    """True when this text names the word but teaches the other article or the wrong sound."""
+    text = blob or ""
+    if not contains_word(text, word):
+        return False
+    other = "a" if want == "an" else "an"
+    if re.search(rf"而不是\s*[\"'“]?{want}\b", text, flags=re.IGNORECASE):
+        return True
+    chooses_other = chooses_article(text, other)
+    chooses_want = chooses_article(text, want)
+    if chooses_other and not chooses_want:
+        return True
+    token = word.lower()
+    if want == "an" and token in ARTICLE_AN_SOUND and "辅音音素" in text:
+        return True
+    if want == "a" and token in ARTICLE_A_SOUND and "元音音素开头" in text and "辅音" not in text:
+        return True
+    if want == "an" and token not in ARTICLE_A_SOUND and re.search(
+        r"ju[:：']|/ju|读\s*['\"]?ju", text, flags=re.IGNORECASE
+    ):
+        return True
+    return False
+
+
+def align_article_thinking(thinking: str, message: str) -> str:
+    """Replace a thinking sentence that pairs a known word with the wrong article."""
+    text = message or ""
+    if looks_like_cloze_blanks(text) or not looks_like_grammar_fill(text):
+        return thinking
+    words = [(word, expected_article(word)) for _blank, word in article_blank_pairs(text)]
+    words = [(word, want) for word, want in words if want in {"a", "an"}]
+    if not words:
+        return thinking
+
+    def fix_sentence(sentence: str) -> str:
+        mentioned = [(word, want) for word, want in words if contains_word(sentence, word)]
+        if not mentioned:
+            return sentence
+        if len({want for _word, want in mentioned}) > 1 and re.search(r"类似|也一样|同样", sentence):
+            return "".join(article_basis(word, want) for word, want in mentioned)
+        for word, want in mentioned:
+            if article_claim_is_wrong(sentence, word, want):
+                return article_basis(word, want)
+        return sentence
+
+    parts = re.split(r"(?<=[。！？])", thinking or "")
+    return "".join(fix_sentence(part) for part in parts)
+
+
+def _step_is_about_blank(step: dict[str, object], blank: str, steps: list[object] | None = None) -> bool:
+    if step_targets_blank(step, blank, steps):
+        return True
+    conclusion = str(step.get("conclusion") or "").strip().lower()
+    return not step_item_nums(step) and conclusion in {"a", "an", "the"}
+
+
+def _sync_article_explanations(parsed: dict[str, object], blanks: list[tuple[str, str]]) -> None:
+    words = [(blank, word, expected_article(word)) for blank, word in blanks]
+    words = [(blank, word, want) for blank, word, want in words if want in {"a", "an"}]
+    steps = parsed.get("reasoning_steps")
+    if isinstance(steps, list):
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            blob = " ".join(str(step.get(key) or "") for key in ("focus", "basis", "conclusion"))
+            mentioned = [
+                (blank, word, want)
+                for blank, word, want in words
+                if contains_word(blob, word) and _step_is_about_blank(step, blank, steps)
+            ]
+            if len({want for _blank, _word, want in mentioned}) > 1 and re.search(r"类似|也一样|同样", blob):
+                step["basis"] = "".join(article_basis(word, want) for _blank, word, want in mentioned)
+                step["conclusion"] = "；".join(f"{word} {want}" for _blank, word, want in mentioned)
+                continue
+            for blank, word, want in mentioned:
+                if not article_claim_is_wrong(blob, word, want):
+                    continue
+                step["basis"] = article_basis(word, want)
+                step["conclusion"] = want
+                break
+    methods = parsed.get("knowledge_methodology")
+    if isinstance(methods, list):
+        rewritten: list[object] = []
+        for item in methods:
+            text = str(item or "")
+            replacement = ""
+            for _blank, word, want in words:
+                if article_claim_is_wrong(text, word, want):
+                    replacement = article_basis(word, want)
+                    break
+            rewritten.append(replacement or item)
+        parsed["knowledge_methodology"] = rewritten
+
+
+def revise_article_by_sound(parsed: dict[str, object], message: str) -> None:
+    """a/an follows the next word's sound, including inside a multi-blank grammar fill."""
+    text = message or ""
+    if looks_like_cloze_blanks(text) or not looks_like_grammar_fill(text):
+        return
+    answer = str(parsed.get("answer") or "")
+    blanks = article_blank_pairs(text)
+    if not blanks:
+        return
+    for blank, word in blanks:
+        want = expected_article(word)
+        if want not in {"a", "an"}:
+            continue
+        pattern = rf"(\(\s*{blank}\s*\)\s*)(an|a)\b"
+        match = re.search(pattern, answer, flags=re.IGNORECASE)
+        if not match or match.group(2).lower() == want:
+            continue
+        current = match.group(2)
+        replacement = want.capitalize() if current[:1].isupper() else want
+        answer = re.sub(pattern, rf"\1{replacement}", answer, count=1, flags=re.IGNORECASE)
+        basis = article_basis(word, want)
+        steps = parsed.get("reasoning_steps")
+        if isinstance(steps, list):
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                blob = " ".join(str(step.get(key) or "") for key in ("focus", "basis", "conclusion"))
+                if not _step_is_about_blank(step, blank, steps) or not contains_word(blob, word):
+                    continue
+                if re.search(rf"\b{current}\b", blob, flags=re.IGNORECASE) or "独一无二" in blob:
+                    step["basis"] = basis
+                    step["conclusion"] = replacement
+    parsed["answer"] = answer
+    _sync_article_explanations(parsed, blanks)
+
+
+def revise_uncued_cloze_verb(parsed: dict[str, object], message: str) -> None:
+    """Drop a verb option that needs an object the passage never mentions."""
+    text = message or ""
+    if not looks_like_cloze_blanks(text):
+        return
+    groups = {
+        match.group(1): {
+            "A": match.group(2).lower(),
+            "B": match.group(3).lower(),
+            "C": match.group(4).lower(),
+            "D": match.group(5).lower(),
+        }
+        for match in CLOZE_CHOICE_RE.finditer(text)
+    }
+    if not groups:
+        return
+    answer = str(parsed.get("answer") or "")
+    for blank, choices in groups.items():
+        token_match = re.search(rf"\(\s*{blank}\s*\)\s*([A-Da-d]|[A-Za-z]+)", answer)
+        if not token_match:
+            continue
+        token = token_match.group(1)
+        if token.upper() in choices:
+            word = choices[token.upper()]
+            use_letter = True
+        else:
+            word = token.lower()
+            use_letter = False
+        cue = UNCUE_VERBS.get(word)
+        if not cue or re.search(cue, text, flags=re.IGNORECASE):
+            continue
+        safe_letter = next((letter for letter, option in choices.items() if option in SAFE_PERCEPTION_VERBS), "")
+        if not safe_letter:
+            continue
+        safe_word = choices[safe_letter]
+        replacement = safe_letter if use_letter else safe_word
+        answer = re.sub(
+            rf"(\(\s*{blank}\s*\)\s*){re.escape(token)}\b",
+            rf"\1{replacement}",
+            answer,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+        basis = (
+            f"这一空不能选 {word}：原文没有支撑这个动作的信息，等于用常识补情节。"
+            f"同空的 {safe_word} 才和原句的动作接得上。"
+        )
+        steps = parsed.get("reasoning_steps")
+        if isinstance(steps, list):
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                blob = " ".join(str(step.get(key) or "") for key in ("focus", "basis", "conclusion"))
+                if not step_targets_blank(step, blank, steps):
+                    continue
+                if word in blob.lower() or token.lower() == word:
+                    step["basis"] = basis
+                    step["conclusion"] = safe_word
+    parsed["answer"] = answer
+
+
+def revise_uncertain_whether(parsed: dict[str, object], message: str) -> None:
+    """nobody knows + will is an open question, so the gap is whether, not that."""
+    text = message or ""
+    if looks_like_cloze_blanks(text):
+        return
+    answer = str(parsed.get("answer") or "")
+    for sentence in re.split(r"(?<=[.!?。])\s+|\n+", text):
+        if not re.search(r"\b(?:nobody|no one)\s+knows?\b", sentence, flags=re.IGNORECASE):
+            continue
+        if not re.search(r"_{2,}", sentence) or not re.search(r"\bwill\b", sentence, flags=re.IGNORECASE):
+            continue
+        numbered = re.search(r"\(\s*(\d{1,2})\s*\)\s*_{2,}", sentence)
+        if not numbered:
+            continue
+        blank = numbered.group(1)
+        pattern = rf"(\(\s*{blank}\s*\)\s*)that\b"
+        answer, count = re.subn(pattern, rf"\1whether", answer, count=1, flags=re.IGNORECASE)
+        if not count:
+            continue
+        basis = "nobody knows 后面是还没确定的结果，填 whether。that 会把这件事说成已经确定的事实。"
+        steps = parsed.get("reasoning_steps")
+        if isinstance(steps, list):
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                blob = " ".join(str(step.get(key) or "") for key in ("focus", "basis", "conclusion"))
+                if not step_targets_blank(step, blank, steps):
+                    continue
+                if re.search(r"\bthat\b|确定事实", blob, flags=re.IGNORECASE):
+                    step["basis"] = basis
+                    step["conclusion"] = "whether"
+        methods = parsed.get("knowledge_methodology")
+        if isinstance(methods, list):
+            parsed["knowledge_methodology"] = [
+                basis if isinstance(item, str) and re.search(r"\bthat\b|确定事实", item, flags=re.IGNORECASE) else item
+                for item in methods
+            ]
+    parsed["answer"] = answer
+
+
+def drop_meta_reasoning_steps(parsed: dict[str, object]) -> None:
+    steps = parsed.get("reasoning_steps")
+    if not isinstance(steps, list):
+        return
+    kept: list[dict[str, object]] = []
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        blob = " ".join(str(step.get(key) or "") for key in ("focus", "basis", "conclusion"))
+        cjk = len(re.findall(r"[\u4e00-\u9fff]", blob))
+        latin = len(re.findall(r"[A-Za-z]{3,}", blob))
+        has_reason = bool(re.search(r"排除|冲突|所以|因此|改为|不能|不接|填|用", blob))
+        if META_STEP_RE.search(blob):
+            continue
+        if re.search(r"判断题型", blob) and not re.search(r"改为|排除|冲突|原句", blob):
+            continue
+        if cjk < 12 and latin >= 4 and not has_reason:
+            continue
+        kept.append(step)
+    if not kept:
+        return
+    for index, step in enumerate(kept, start=1):
+        step["step"] = index
+    parsed["reasoning_steps"] = kept
+
+
+def drop_duplicate_blank_steps(parsed: dict[str, object]) -> None:
+    """A format pass sometimes repeats the same item as both '31' and '空31'."""
+    steps = parsed.get("reasoning_steps")
+    if not isinstance(steps, list):
+        return
+    kept: list[dict[str, object]] = []
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        basis = re.sub(r"[\s。；;]+", "", str(step.get("basis") or ""))
+        nums = step_item_nums(step)
+        duplicate = False
+        if basis:
+            for prev in kept:
+                prev_basis = re.sub(r"[\s。；;]+", "", str(prev.get("basis") or ""))
+                prev_nums = step_item_nums(prev)
+                same_item = not nums or not prev_nums or bool(nums & prev_nums)
+                if same_item and prev_basis and (basis == prev_basis or basis in prev_basis or prev_basis in basis):
+                    duplicate = True
+                    if len(basis) > len(prev_basis):
+                        prev["basis"] = step.get("basis")
+                        if str(step.get("conclusion") or "") and not str(prev.get("conclusion") or ""):
+                            prev["conclusion"] = step.get("conclusion")
+                    break
+        if not duplicate:
+            kept.append(step)
+    if len(kept) == sum(isinstance(step, dict) for step in steps):
+        return
+    for index, step in enumerate(kept, start=1):
+        step["step"] = index
+    parsed["reasoning_steps"] = kept
+
+
+def revise_extra_finite_participle(parsed: dict[str, object], message: str) -> None:
+    """A blank between a noun and an existing finite verb is a participle, not was/were + participle."""
+    text = message or ""
+    if looks_like_cloze_blanks(text) or not looks_like_grammar_fill(text):
+        return
+    answer = str(parsed.get("answer") or "")
+    finite = re.compile(
+        r"\b(?:connects|looks|makes|takes|gives|shows|seems|becomes|remains|stands|sits|lives|works|plays|needs|wants)\b",
+        re.IGNORECASE,
+    )
+    for blank, _hint in re.findall(r"\(\s*(\d{1,2})\s*\)\s*_{2,}\s*\(\s*([A-Za-z]+)\s*\)", text):
+        sentence = sentence_containing_blank(text, blank)
+        match = re.search(rf"(\(\s*{blank}\s*\)\s*)((?:was|were|is|are)\s+)([A-Za-z]+)", answer, flags=re.IGNORECASE)
+        if not match:
+            continue
+        rest = re.sub(rf"\(\s*{blank}\s*\)\s*_{{2,}}(?:\s*\([^)]*\))?", " ", sentence)
+        if not finite.search(rest):
+            continue
+        participle = match.group(3)
+        answer = answer[: match.start()] + match.group(1) + participle + answer[match.end() :]
+        basis = "这句已经有谓语，空格只能填非谓语。was/were 会再造一个谓语，所以只留过去分词。"
+        steps = parsed.get("reasoning_steps")
+        if isinstance(steps, list):
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                blob = " ".join(str(step.get(key) or "") for key in ("focus", "basis", "conclusion"))
+                if not step_targets_blank(step, blank, steps):
+                    continue
+                if re.search(r"\b(?:was|were|is|are)\b", blob, flags=re.IGNORECASE):
+                    step["basis"] = basis
+                    step["conclusion"] = participle
+    parsed["answer"] = answer
+
+
+def scrub_echoed_analysis(parsed: dict[str, object], message: str) -> None:
+    """Drop a pasted 解析 sentence, including the test marker, from the formal reply."""
+    text = message or ""
+    markers = re.findall(r"复述码[A-Za-z0-9]+", text)
+    parse = re.search(r"解析\s*[:：]\s*(.+)$", text, flags=re.S)
+    chunks = []
+    if parse:
+        chunks = [part.strip() for part in re.split(r"[。！？\n]", parse.group(1)) if len(part.strip()) >= 8]
+
+    def clean(value: object) -> str:
+        result = str(value or "")
+        for marker in markers:
+            result = result.replace(marker, "")
+        for chunk in chunks:
+            result = result.replace(chunk, "")
+        result = re.sub(r"这是紧张的表现[，,。]?", "", result)
+        return re.sub(r"[ \t]{2,}", " ", result).strip(" ，,。；;")
+
+    for key in ("answer", "stem_understanding", "follow_up", "subtype", "unsupported_reason"):
+        if key in parsed:
+            parsed[key] = clean(parsed.get(key))
+    steps = parsed.get("reasoning_steps")
+    if isinstance(steps, list):
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            for key in ("focus", "basis", "conclusion"):
+                step[key] = clean(step.get(key))
+    methods = parsed.get("knowledge_methodology")
+    if isinstance(methods, list):
+        parsed["knowledge_methodology"] = [clean(item) for item in methods if clean(item)]
+
+
+def scrub_echoed_thinking(thinking: str, message: str) -> str:
+    text = thinking or ""
+    for marker in re.findall(r"复述码[A-Za-z0-9]+", message or ""):
+        text = text.replace(marker, "")
+    parse = re.search(r"解析\s*[:：]\s*(.+)$", message or "", flags=re.S)
+    if parse:
+        for chunk in re.split(r"[。！？\n]", parse.group(1)):
+            chunk = chunk.strip()
+            if len(chunk) >= 8:
+                text = text.replace(chunk, "")
+    text = re.sub(r"这是紧张的表现[，,。]?", "", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def revise_fronted_passive_participle(parsed: dict[str, object], message: str) -> None:
+    """Seen from the hill: the subject is seen, so the fronted participle is past, not seeing."""
+    text = message or ""
+    if looks_like_cloze_blanks(text) or not looks_like_grammar_fill(text):
+        return
+    past_forms = {"see": "seen", "hear": "heard", "notice": "noticed", "observe": "observed"}
+    answer = str(parsed.get("answer") or "")
+    for blank, hint in re.findall(
+        r"\(\s*(\d{1,2})\s*\)\s*_{2,}\s*\(\s*(see|hear|notice|observe)\s*\)\s+from\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        doing = f"{hint.lower()}ing"
+        past = past_forms[hint.lower()]
+        answer, count = re.subn(
+            rf"(\(\s*{blank}\s*\)\s*){doing}\b",
+            rf"\1{past}",
+            answer,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+        if not count:
+            continue
+        basis = (
+            f"句首这个动作的逻辑主语是后面句子的主语，主语是被{hint.lower()}的一方，"
+            f"所以用过去分词 {past}。{doing} 会把主语写成动作的发出者。"
+        )
+        steps = parsed.get("reasoning_steps")
+        if isinstance(steps, list):
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                blob = " ".join(str(step.get(key) or "") for key in ("focus", "basis", "conclusion"))
+                if not step_targets_blank(step, blank, steps):
+                    continue
+                if re.search(rf"\b{doing}\b", blob, flags=re.IGNORECASE) or "现在分词" in blob:
+                    step["basis"] = basis
+                    step["conclusion"] = past
+    parsed["answer"] = answer
+
+
+def align_fronted_passive_thinking(thinking: str, message: str) -> str:
+    text = message or ""
+    past_forms = {"see": "seen", "hear": "heard", "notice": "noticed", "observe": "observed"}
+    hints = re.findall(
+        r"_{2,}\s*\(\s*(see|hear|notice|observe)\s*\)\s+from\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+    result = thinking or ""
+    for hint in hints:
+        doing = f"{hint.lower()}ing"
+        past = past_forms[hint.lower()]
+        result = re.sub(
+            rf"((?:填|用|是|为)\s*){doing}\b",
+            rf"\1{past}",
+            result,
+            flags=re.IGNORECASE,
+        )
+    return result
+
+
+def apply_answer_corrections(parsed: dict[str, object], message: str) -> None:
+    revise_unjustified_past_perfect(parsed, message)
+    revise_complete_relative_clause(parsed, message)
+    revise_article_by_sound(parsed, message)
+    revise_uncued_cloze_verb(parsed, message)
+    revise_extra_finite_participle(parsed, message)
+    revise_fronted_passive_participle(parsed, message)
+    revise_uncertain_whether(parsed, message)
+    scrub_echoed_analysis(parsed, message)
+    drop_meta_reasoning_steps(parsed)
+    drop_duplicate_blank_steps(parsed)
+    scrub_format_leaks(parsed)
+
+
 def infer_requested_question_type(message: str) -> str:
     text = message or ""
     if re.search(r"七选五", text):
         return "七选五"
+    if re.search(r"长难句", text):
+        return "长难句"
+    if re.search(r"词义|选词填空|词汇", text):
+        return "词汇"
     if re.search(r"阅读", text):
         return "阅读"
     if re.search(r"完型|完形", text):
@@ -919,6 +1587,8 @@ def apply_need_material_defaults(parsed: dict[str, object], message: str) -> dic
         "七选五": "把七选五原文和选项 A-G 发过来，或直接传截图。",
         "改错": "把短文改错原文发过来。",
         "翻译": "把要讲的句子或段落发过来。",
+        "词汇": "把原句、要猜的词和选项发过来。选词填空请把词库一起发来。",
+        "长难句": "把要分析的原句发过来。",
     }.get(question_type, "把原文、题干或截图发过来。")
     parsed["supported"] = True
     parsed["question_type"] = question_type
@@ -964,8 +1634,7 @@ def normalize_structured_reply(
         parsed = apply_need_material_defaults(parsed, message)
     else:
         parsed["question_type"] = classify_question_type(message, parsed, image_context)
-        revise_unjustified_past_perfect(parsed, message)
-        revise_complete_relative_clause(parsed, message)
+        apply_answer_corrections(parsed, message)
         scrub_fabricated_distractors(parsed, message, image_context)
         if not asked_for_knowledge_cards(message):
             parsed["knowledge_cards"] = []
@@ -993,7 +1662,11 @@ def classify_question_type(
     # 题型以学生材料上的题头为准。模型答案里的“(1) B”和解析里的“翻译”不能把整题改判。
     if looks_like_seven_choose_five(user_side):
         return "七选五"
-    if re.search(r"语法填空", user_side):
+    if re.search(r"长难句", user_side):
+        return "长难句"
+    if re.search(r"词义猜测|猜测词义|选词填空|词汇题", user_side) and not re.search(r"阅读理解", user_side):
+        return "词汇"
+    if re.search(r"语法填空|语法选择|单项选择|单项填空", user_side) or looks_like_single_grammar_choice(user_side):
         return "语法"
     if re.search(r"完形填空|完型填空", user_side):
         return "完型"
@@ -1022,10 +1695,14 @@ def classify_question_type(
         return "语法"
     if cloze_blanks or (cloze_named and not grammar_hint):
         return "完型"
-    if grammar_fill:
+    if grammar_fill or looks_like_single_grammar_choice(user_side):
         return "语法"
     if has_options and not reading_like:
-        return "完型"
+        # 只有多空、或每空一组选项，才是完型。单独一道选择题按语法讲。
+        # 文章已经很长、又没有完型空号时，按阅读讲，避免套起承转合。
+        if english_word_count(user_side) >= 90:
+            return "阅读"
+        return "语法"
     if re.search(r"语法", claimed):
         return "语法"
     if re.search(r"完型|完形", claimed):
@@ -1036,6 +1713,10 @@ def classify_question_type(
         return "改错"
     if re.search(r"翻译", claimed):
         return "翻译"
+    if re.search(r"词汇", claimed):
+        return "词汇"
+    if re.search(r"长难句", claimed):
+        return "长难句"
     return claimed or "语法"
 
 
@@ -1052,6 +1733,7 @@ def scrub_fabricated_distractors(
         parsed["distractor_analysis"] = {"A": "", "B": "", "C": "", "D": ""}
 
 
+# Not sent to the model. Teach states use the short card in prompt_1.md for the current type.
 CONVERSATION_RULES = """思考时只用自然语言看句子：空在哪、前后是什么、为什么排除、填什么。
 禁止在思考中出现 JSON、字段名、schema、输出格式、Markdown、代码块。
 禁止写 supported、question_type、reasoning_steps、knowledge_methodology、distractor_analysis、stem_understanding、knowledge_cards、need_more_context。
@@ -1107,11 +1789,77 @@ THINKING_HANDOFF_RE = re.compile(
 THINKING_KEEP_RE = re.compile(
     r"空\s*[（(]?\d|第\s*\d+\s*[空题]|排除|原句|选项|所以|因此|填|改为|冲突|矛盾|发音|时态|因为|不能|不对|正确"
 )
+FORMAT_LEAK_RE = re.compile(
+    r"留空字符串|在代码中|在输出中|确保覆盖|空字符串|语言严肃简练|"
+    r"知识方法论\s*[:：]|从提取\s*[:：]|但要简洁|"
+    r"现在[，,]\s*(?:确认|确保)|"
+    r"首先[，,]\s*supported|"
+    r"supported\s*[:：]\s*(?:true|false)|"
+    r"只有题干里真的出现|"
+    r"调用(?:阅读|完型|完形|语法)?方法论\s*[:：]|方法论\s*[:：]|"
+    r"不能编造|用中文讲解|focus\s*写|用户误说|所以[，,]?\s*题型是|没有指定空号|确认字段|"
+    r"确保格式|写成字符串|可操作的判断|有点短|answer\s*字段|注意\s*[:：]\s*用户说|但要\s*3|在\s*conclusion|"
+    r"在示例中|或留空|为了安全|"
+    r"\}\s*,?\s*\}|\"\s*[A-G]\s*\"\s*[:：]",
+    re.IGNORECASE,
+)
+
+
+def strip_type_meta(text: str) -> str:
+    """Drop a '判断题型' aside. It is planner talk, not the explanation."""
+    return re.sub(r"(?:先|我需要|需要|这里|所以)?判断题型[：:，,]?[^。！？\n]{0,80}[。！？]?", "", text or "")
+
+
+def cut_format_leak(text: str) -> str:
+    """Drop a format/schema tail. Keep an earlier teaching sentence when it is still substantial."""
+    raw = re.sub(r"^在思考中[，,]\s*", "", text or "").strip()
+    match = FORMAT_LEAK_RE.search(raw)
+    if not match:
+        return raw
+    head = raw[: match.start()].strip(" ，,。；;\"'“”\n\t")
+    head = re.sub(r"(?:现在|接下来|然后)[，,]?\s*$", "", head).strip(" ，,。；;\"'“”\n\t")
+    if len(re.findall(r"[\u4e00-\u9fff]", head)) < 12:
+        return ""
+    return head
+
+
+def scrub_format_leaks(parsed: dict[str, object]) -> None:
+    """Remove schema and prompt-echo tails from the formal reply the student sees."""
+    for key in ("stem_understanding", "follow_up", "subtype", "unsupported_reason"):
+        if key in parsed:
+            parsed[key] = cut_format_leak(str(parsed.get(key) or ""))
+    steps = parsed.get("reasoning_steps")
+    if isinstance(steps, list):
+        kept: list[dict[str, object]] = []
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            cleaned = dict(step)
+            original = strip_type_meta(" ".join(str(step.get(key) or "") for key in ("focus", "basis", "conclusion")))
+            if re.search(r"不能编造|用中文讲解", original):
+                continue
+            for key in ("focus", "basis", "conclusion"):
+                cleaned[key] = cut_format_leak(strip_type_meta(str(step.get(key) or "")))
+            blob = " ".join(str(cleaned.get(key) or "") for key in ("focus", "basis", "conclusion"))
+            if len(re.findall(r"[\u4e00-\u9fff]", blob)) < 8:
+                continue
+            kept.append(cleaned)
+        if kept:
+            for index, step in enumerate(kept, start=1):
+                step["step"] = index
+            parsed["reasoning_steps"] = kept
+    methods = parsed.get("knowledge_methodology")
+    if isinstance(methods, list):
+        parsed["knowledge_methodology"] = [
+            item for item in (cut_format_leak(str(method)) for method in methods) if item
+        ]
 
 
 def salvage_thinking_sentence(sentence: str) -> str:
-    item = scrub_rule_index_text(sentence)
+    item = cut_format_leak(strip_type_meta(scrub_rule_index_text(sentence)))
     if not item:
+        return ""
+    if re.fullmatch(r"[\s\"'`{}[\]\\,，:：.。A-Da-d]+", item):
         return ""
     if THINKING_HANDOFF_RE.search(item) and not re.search(r"空\s*[（(]?\d|第\s*\d+\s*空", item):
         return ""
@@ -1122,6 +1870,10 @@ def salvage_thinking_sentence(sentence: str) -> str:
         or re.search(r"JSON|字段名|输出格式|schema|知识卡片|输出要求", item, flags=re.IGNORECASE)
     )
     if not noisy:
+        cjk = len(re.findall(r"[\u4e00-\u9fff]", item))
+        latin = len(re.findall(r"[A-Za-z]{2,}", item))
+        if cjk < 8 and latin >= 4:
+            return ""
         return item
     kept = THINKING_NOISE_RE.sub("", item)
     kept = re.sub(r"JSON|字段名|输出格式|schema|知识卡片|输出要求", "", kept, flags=re.IGNORECASE)
@@ -1134,7 +1886,10 @@ def salvage_thinking_sentence(sentence: str) -> str:
 
 
 def sanitize_thinking_text(text: str, live: bool = False) -> str:
-    source = re.sub(r"```(?:json)?[\s\S]*?```", "\n", text or "", flags=re.IGNORECASE)
+    source = strip_type_meta(text or "")
+    source = re.sub(r"```(?:json)?[\s\S]*?```", "\n", source, flags=re.IGNORECASE)
+    source = re.sub(r"\}\s*,?\s*\}", "\n", source)
+    source = re.sub(r'"\s*[A-D]\s*"\s*[:：][^。\n]{0,80}', "", source)
     source = re.sub(r'\{[\s\S]*?"supported"\s*:[\s\S]*?\}\s*', "\n", source)
     source = RULE_INDEX_CHUNK_RE.sub("", source)
     source = METHODOLOGY_LIST_DUMP_RE.sub("", source)
@@ -1173,7 +1928,10 @@ def sanitize_thinking_text(text: str, live: bool = False) -> str:
             flags=re.IGNORECASE,
         ):
             cleaned.pop()
-    return re.sub(r"\n{3,}", "\n\n", "\n\n".join(cleaned)).strip()
+    cleaned_text = re.sub(r"\n{3,}", "\n\n", "\n\n".join(cleaned)).strip()
+    cleaned_text = re.sub(r"\}\s*,?\s*\}", "\n", cleaned_text)
+    cleaned_text = re.sub(r"(?m)^[\s\"'`{}[\]\\,，:：.。]+$", "", cleaned_text)
+    return re.sub(r"\n{3,}", "\n\n", cleaned_text).strip()
 
 
 def thinking_from_structured_reply(reply: str) -> str:
@@ -1214,7 +1972,7 @@ def blank_nums_in_text(text: str) -> set[int]:
         if not raw:
             continue
         value = int(raw)
-        if 1 <= value <= 20:
+        if 1 <= value <= MAX_EXAM_ITEM:
             nums.add(value)
     return nums
 
@@ -1342,7 +2100,12 @@ def merge_thinking_into_structured_reply(reply: str, thinking: str) -> str:
         blob = step_blob(step)
         if len(blob) > 1200:
             return True
-        return bool(re.search(r"完型知识点|名词题[:：]|方法论包括", blob[:120]))
+        if re.search(r"完型知识点|名词题[:：]|方法论包括", blob[:120]):
+            return True
+        leaked = cut_format_leak(blob)
+        if leaked != blob.strip() and cjk_count(leaked) < 24:
+            return True
+        return False
 
     merged: list[dict[str, object]] = []
     used: set[int] = set()
@@ -1494,14 +2257,7 @@ def decorate_current_user_message(message: str) -> str:
     if looks_like_reading(text) and has_explicit_options(text) and not looks_like_cloze_blanks(text):
         notes.append("这是阅读理解，不是完型。")
     if looks_like_cloze_blanks(text) and not user_specified_single_target(text):
-        notes.append(
-            "这是完型填空。材料里有几空，reasoning_steps 就写几步，一空一步，focus 写空号，后半篇不能省。"
-            "禁止只用一段故事复述代替逐空讲解。stem_understanding 只留一句篇章走向。"
-            "每一空写：原句关键词、用哪条判断规则、为什么是这个选项、另外几个选项和原句哪里冲突。"
-            "禁止把整句翻译成中文来充当讲解，也不要用“紧张的表现/常见反应/不自然”代替冲突点。"
-            "动词不要靠常识补原文没有的动作。keep doing 要看这个动作和后一句是否接得上，原文没写的动作不能选。"
-            "思考要把每一空都想完再停，不要在半句写“现在输出”。正式 JSON 覆盖的空必须和思考一样全。"
-        )
+        notes.append("这是同一套完型。材料里有几空就写几步，一空一步。")
     if looks_like_grammar_fill(text) and not looks_like_cloze_blanks(text) and PLACE_RELATIVE_RE.search(text):
         notes.append(
             "空格前是地点，后面从句的宾语已经齐全（如 spent my childhood）时填 where，不填 which。"
@@ -1510,12 +2266,7 @@ def decorate_current_user_message(message: str) -> str:
     if looks_like_grammar_fill(text) and not looks_like_cloze_blanks(text) and TIME_RELATIVE_RE.search(text):
         notes.append("空格前是时间，后面从句已经完整时填 when，不填 which。")
     if looks_like_supplied_answer_key(text):
-        notes.append(
-            "学生附上了答案或解析，只用来核对，不要当讲稿复述。"
-            "不要翻译原句，不要照抄五三/解析的措辞。"
-            "按陶然的完形方法讲：名词看复现或概括，动词看动作链和发出者，形容词副词看正负态度，连词看逻辑，结尾抽象名词先当核心概念。"
-            "学生要的是怎么判断，不是译文加选项字母。"
-        )
+        notes.append("学生附了答案或解析，只用来核对。不要复述解析，不要把原句翻译一遍。")
     if looks_like_grammar_fill(text) and not looks_like_cloze_blanks(text) and not user_specified_single_target(text):
         if len(re.findall(r"\(\s*\d{1,2}\s*\)", text)) >= 2:
             notes.append("这是同一套语法填空。把能看到的每一空都讲完，answer 按空号列全。")
@@ -1533,6 +2284,8 @@ def decorate_current_user_message(message: str) -> str:
         notes.append("同一句里如果已经另有谓语，空格处用非谓语（如 written），不要再填 was written / is written。")
     if is_explicit_new_question_turn(text):
         notes.append("这是新题。只根据本条消息里的原文/题干/选项作答，不要沿用上一题的答案或时态结论。")
+    if re.search(r"改错", text) and english_word_count(text) >= 8:
+        notes.append("这是短文改错，原文已经在本条消息里。直接找出错误并讲完，不要回答需要确认，也不要让学生重发。")
     if notes:
         return text + "\n\n" + " ".join(notes)
     return text
@@ -1549,9 +2302,25 @@ def prior_chat_history(history: list[ChatMessage], message: str, *, limit: int) 
     return prior[-limit:]
 
 
-def iter_compacted_history(history: list[ChatMessage], message: str, *, limit: int) -> list[tuple[str, str]]:
-    prior = prior_chat_history(history, message, limit=max(limit * 3, 18))
+def should_isolate_history(message: str, material: str | None = None) -> bool:
+    """A new stem in this turn should not inherit the previous passage."""
     if is_explicit_new_question_turn(message):
+        return True
+    if is_blank_followup(message):
+        return False
+    probe = "\n".join(part for part in (message, material) if part)
+    return has_enough_question_material(probe)
+
+
+def iter_compacted_history(
+    history: list[ChatMessage],
+    message: str,
+    *,
+    limit: int,
+    material: str | None = None,
+) -> list[tuple[str, str]]:
+    prior = prior_chat_history(history, message, limit=max(limit * 3, 18))
+    if should_isolate_history(message, material):
         prior = []
     compacted: list[tuple[str, str]] = []
     for item in prior:
@@ -1566,15 +2335,113 @@ def iter_compacted_history(history: list[ChatMessage], message: str, *, limit: i
     return compacted[-limit:]
 
 
-def build_text_messages(message: str, history: list[ChatMessage]) -> list[dict]:
+def question_type_from_history(history: list[ChatMessage]) -> str:
+    for item in reversed(history):
+        if item.sender != "ai":
+            continue
+        parsed = parse_structured_reply(item.content)
+        if parsed:
+            label = str(parsed.get("question_type") or "").strip().replace("完形", "完型")
+            if label in KNOWN_QUESTION_TYPES and label != "综合":
+                return label
+        match = re.search(rf"题型：\s*({QUESTION_TYPE_PATTERN})", item.content or "")
+        if match:
+            return match.group(1).replace("完形", "完型")
+    return ""
+
+
+def parse_classified_type(text: str) -> str:
+    match = re.search(
+        rf'"question_type"\s*:\s*"({QUESTION_TYPE_PATTERN})"',
+        text or "",
+    )
+    label = match.group(1) if match else ""
+    if not label:
+        match = re.search(QUESTION_TYPE_PATTERN, text or "")
+        label = match.group(0) if match else ""
+    label = label.replace("完形", "完型")
+    return label if label in KNOWN_QUESTION_TYPES else ""
+
+
+def material_type_is_confident(message: str, image_context: str | None, guessed: str) -> bool:
+    user = "\n".join(part for part in (message, image_context) if part)
+    if looks_like_seven_choose_five(user):
+        return guessed == "七选五"
+    if re.search(r"长难句", user):
+        return guessed == "长难句"
+    if re.search(r"词义猜测|猜测词义|选词填空|词汇题", user) and not re.search(r"阅读理解", user):
+        return guessed == "词汇"
+    if (
+        re.search(r"语法填空|语法选择|单项选择|单项填空", user)
+        or looks_like_single_grammar_choice(user)
+        or (looks_like_grammar_fill(user) and not looks_like_cloze_blanks(user))
+    ):
+        return guessed == "语法"
+    if re.search(r"完形|完型", user) or looks_like_cloze_blanks(user):
+        return guessed == "完型"
+    if re.search(r"阅读理解", user) or (looks_like_reading(user) and not looks_like_cloze_blanks(user)):
+        return guessed == "阅读"
+    if re.search(r"改错", user) and has_translatable_or_correctable_sentence(user):
+        return guessed == "改错"
+    if re.search(r"翻译", user) and has_translatable_or_correctable_sentence(user):
+        return guessed == "翻译"
+    return False
+
+
+def teaching_material(message: str, image_context: str | None = None) -> str:
+    parts = [(message or "").strip()]
+    extra = (image_context or "").strip()
+    if extra and extra not in (message or ""):
+        parts.append(extra)
+    return "\n".join(part for part in parts if part)
+
+
+def build_text_messages(
+    message: str,
+    history: list[ChatMessage],
+    question_type: str = "综合",
+    material: str | None = None,
+) -> list[dict]:
+    """Teach with one type card. The archived full prompt is not included."""
     messages: list[dict] = [
-        {"role": "system", "content": get_teaching_prompt()},
-        {"role": "system", "content": CONVERSATION_RULES},
+        {"role": "system", "content": teach_system_prompt(question_type)},
     ]
-    for role, content in iter_compacted_history(history, message, limit=12):
+    for role, content in iter_compacted_history(history, message, limit=12, material=material):
         messages.append({"role": role, "content": content})
-    messages.append({"role": "user", "content": decorate_current_user_message(message)})
+    user_text = decorate_current_user_message(message)
+    extra = (material or "").strip()
+    if extra and extra not in user_text:
+        user_text = f"{user_text}\n\n题目文字：\n{extra}"
+    user_text += (
+        "\n\n按空写讲稿，每一步开头写空号或题号。"
+        "每一空写成三句：这个空在这句里充当什么。哪几个原词决定它。被排除的形式为什么和这些词接不上。"
+        "括号里有提示词时，结论必须是这个词的一种形式。不要改讲冠词、介词或另一个空。"
+        "用中文判断。不要输出 JSON，不要翻译整段，不要只写「排除、冲突、所以」。"
+    )
+    messages.append({"role": "user", "content": user_text})
     return messages
+
+
+def build_format_messages(question_type: str, material: str, prose: str) -> list[dict]:
+    """Second respond: pack an already written explanation. No type rules."""
+    return [
+        {"role": "system", "content": format_system_prompt()},
+        {
+            "role": "user",
+            "content": (
+                f"题型：{question_type}\n\n题目：\n{material[:5000]}\n\n讲稿：\n{prose[:7000]}\n\n"
+                "把讲稿收成一个 JSON。不要新编情节。"
+            ),
+        },
+    ]
+
+
+def build_classify_messages(message: str, image_context: str | None = None) -> list[dict]:
+    system = prompt_block("classify") or "只判断题型，不要讲题。只输出 question_type。"
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": teaching_material(message, image_context)[:6000]},
+    ]
 
 
 def build_vision_messages(
@@ -1583,47 +2450,139 @@ def build_vision_messages(
     image: ImagePayload,
     ocr_text: str | None = None,
 ) -> list[dict]:
-    messages: list[dict] = [
+    """Vision only copies the question. Teaching happens in a later text respond."""
+    del history, ocr_text
+    return [
         {
             "role": "system",
-            "content": (
-                f"{get_teaching_prompt()}\n\n"
-                f"{CONVERSATION_RULES}\n\n"
-                "当前用户上传了题目图片。结合图片、用户问题和已有上下文作答即可。"
-                "如果图里是完型填空，把能看到的每一空都讲完，一空一步写进 reasoning_steps；"
-                "思考和正式讲解都要覆盖全部空，不要只写一段情节概述或整句翻译。"
-                "学生如果图里带了答案或解析，只用来核对，按判断规则讲，不要复述译文。"
-                "不要因为有下划线空格就判成语法填空。"
-            ),
-        }
+            "content": "只抄题目。保留换行、空格、题号和选项。不要讲题，不要给答案，不要总结。",
+        },
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": decorate_current_user_message(message) or "把图中的题干、原文、空格和选项原样抄出来。"},
+                {"type": "image_url", "image_url": {"url": image.data_url}},
+            ],
+        },
     ]
-    for role, content in iter_compacted_history(history, message, limit=8):
-        messages.append({"role": role, "content": content})
 
-    user_content: list[dict] = [{"type": "text", "text": decorate_current_user_message(message)}]
-    if ocr_text:
-        ocr_notes: list[str] = []
-        if looks_like_cloze_blanks(ocr_text) and not user_specified_single_target(message):
-            ocr_notes.append("图中是完型。每一空都要写进 reasoning_steps，不要只写故事概述或译文。")
-        if looks_like_supplied_answer_key(ocr_text):
-            ocr_notes.append("图里如果有答案或解析，只用来核对。讲解写判断规则和原句冲突，不要翻译原句，不要复述解析。")
-        ocr_suffix = f"\n\n{' '.join(ocr_notes)}" if ocr_notes else ""
-        user_content.append(
-            {
-                "type": "text",
-                "text": f"下面是 OCR 识别出的参考文本，你可以结合图片一起判断：\n{ocr_text}{ocr_suffix}",
-            }
-        )
-    user_content.append({"type": "image_url", "image_url": {"url": image.data_url}})
-    messages.append({"role": "user", "content": user_content})
-    return messages
+
+def create_chat_completion(client: OpenAI, *, enable_thinking: bool = False, **kwargs):
+    """AI Ping turns thinking on for some models, which can leave content empty."""
+    extra_body = {"enable_thinking": True, "thinking_budget": 8192} if enable_thinking else {"enable_thinking": False}
+    try:
+        return client.chat.completions.create(extra_body=extra_body, **kwargs)
+    except Exception:
+        logger.exception("Chat completion extras were rejected, retrying without them")
+        return client.chat.completions.create(**kwargs)
+
+
+def completion_text(completion: object) -> tuple[str, str]:
+    choices = getattr(completion, "choices", None) or []
+    message = choices[0].message if choices else None
+    content = getattr(message, "content", None) or ""
+    reasoning = getattr(message, "reasoning_content", None) or ""
+    if not isinstance(content, str):
+        content = ""
+    if not isinstance(reasoning, str):
+        reasoning = ""
+    if not reasoning and message is not None:
+        extra = getattr(message, "model_extra", None)
+        if isinstance(extra, dict):
+            raw = extra.get("reasoning_content") or extra.get("reasoning") or ""
+            if isinstance(raw, str):
+                reasoning = raw
+    return content, reasoning
+
+
+def reason_thinking_enabled(model: str) -> bool:
+    """DeepSeek V3/V4 keep the draft in the thinking channel and the answer in content."""
+    if model_supports_thinking(model):
+        return True
+    name = (model or "").lower()
+    return "deepseek" in name and any(token in name for token in ("v4", "v3", "r1"))
+
+
+def complete_chat(
+    client: OpenAI,
+    model: str,
+    messages: list[dict],
+    temperature: float,
+    enable_thinking: bool | None = None,
+) -> tuple[str, str]:
+    if enable_thinking is None:
+        enable_thinking = model_supports_thinking(model)
+    completion = create_chat_completion(
+        client,
+        model=model,
+        temperature=temperature,
+        max_tokens=8192,
+        messages=messages,
+        enable_thinking=enable_thinking,
+    )
+    return completion_text(completion)
+
+
+def classify_with_model(
+    client: OpenAI,
+    model: str,
+    message: str,
+    image_context: str | None = None,
+) -> str:
+    reply, _thinking = complete_chat(client, model, build_classify_messages(message, image_context), 0)
+    return parse_classified_type(reply)
+
+
+def resolve_question_type(
+    client: OpenAI | None,
+    model: str,
+    message: str,
+    history: list[ChatMessage],
+    image_context: str | None = None,
+) -> str:
+    """State 1: local shape when it is clear, otherwise one short classify respond."""
+    if is_blank_followup(message):
+        prior_type = question_type_from_history(history)
+        if prior_type:
+            logger.info("teach stage=classify source=history type=%s", prior_type)
+            return prior_type
+    guessed = classify_question_type(message, {}, image_context)
+    if material_type_is_confident(message, image_context, guessed):
+        logger.info("teach stage=classify source=material type=%s", guessed)
+        return guessed
+    if client is not None and has_enough_question_material(message, image_context):
+        labeled = classify_with_model(client, model, message, image_context)
+        if labeled:
+            logger.info("teach stage=classify source=model type=%s", labeled)
+            return labeled
+    logger.info("teach stage=classify source=fallback type=%s", guessed or "综合")
+    return guessed or "综合"
+
+
+def transcribe_question_image(client: OpenAI, image: ImagePayload, model: str) -> str:
+    """State for a picture: copy the question. Do not teach from the image model."""
+    reply, _thinking = complete_chat(
+        client,
+        model,
+        build_vision_messages("", [], image),
+        0.1,
+    )
+    return (reply or "").strip()
 
 
 def extract_ocr_text(client: OpenAI, image: ImagePayload, model: str) -> str:
-    completion = client.chat.completions.create(
-        model=model,
-        temperature=0.1,
-        messages=[
+    if "ocr" in (model or "").lower():
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": image.data_url}},
+                    {"type": "text", "text": "Free OCR."},
+                ],
+            }
+        ]
+    else:
+        messages = [
             {
                 "role": "system",
                 "content": "你是 OCR 识别助手。请只提取图片中的文字内容，保留换行，避免解释。",
@@ -1635,19 +2594,20 @@ def extract_ocr_text(client: OpenAI, image: ImagePayload, model: str) -> str:
                     {"type": "image_url", "image_url": {"url": image.data_url}},
                 ],
             },
-        ],
+        ]
+    completion = create_chat_completion(
+        client,
+        model=model,
+        temperature=0.1,
+        messages=messages,
     )
     return completion.choices[0].message.content or ""
 
 
 def generate_text_reply(client: OpenAI, message: str, history: list[ChatMessage], model: str) -> str:
-    completion = client.chat.completions.create(
-        model=model,
-        temperature=0.5,
-        max_tokens=8192,
-        messages=build_text_messages(message, history),
-    )
-    return completion.choices[0].message.content or ""
+    question_type = resolve_question_type(client, model, message, history, None)
+    reply, _thinking = staged_teach_reply(client, model, message, history, question_type, None, "")
+    return reply
 
 
 def generate_vision_reply(
@@ -1658,13 +2618,8 @@ def generate_vision_reply(
     model: str,
     ocr_text: str | None = None,
 ) -> str:
-    completion = client.chat.completions.create(
-        model=model,
-        temperature=0.7,
-        max_tokens=8192,
-        messages=build_vision_messages(message, history, image, ocr_text=ocr_text),
-    )
-    return completion.choices[0].message.content or ""
+    del message, history, ocr_text
+    return transcribe_question_image(client, image, model)
 
 
 def sse_event(payload: dict[str, object]) -> str:
@@ -1679,6 +2634,679 @@ def thinking_for_forced_reply(reply: str) -> str:
     if parsed and parsed.get("supported") is False:
         return str(parsed.get("unsupported_reason") or parsed.get("stem_understanding") or "当前只讲题，不代写作文。")
     return "这条消息里有不止一道题，先确认要讲哪一道。"
+
+
+def reply_dodges_present_material(
+    reply: str,
+    message: str,
+    image_context: str | None = None,
+    prior_context: str = "",
+) -> bool:
+    """The model asked for the passage even though this turn already contains it."""
+    user_text = "\n".join(part for part in (message, image_context) if part)
+    if looks_like_unspecified_independent_questions(user_text):
+        return False
+    parsed = parse_structured_reply(reply)
+    if not parsed:
+        return False
+    answer = str(parsed.get("answer") or "").strip()
+    if not (parsed.get("need_more_context") or answer == "需要确认"):
+        return False
+    return has_enough_question_material(message, image_context, prior_context)
+
+
+PRESENT_MATERIAL_NUDGE = (
+    "题目原文已经在上一条学生消息里。不要写需要确认，不要让学生重发。"
+    "按题型把每一处讲完，然后输出正式 JSON。"
+)
+
+GROUNDING_NUDGE = (
+    "上一讲不合格。不要把原句译成中文再贴选项字母。"
+    "每一空的步骤里必须出现原句里的词，并写出至少一个干扰项，说明它和原句哪一处冲突。"
+    "丢掉上一讲，重新输出正式 JSON。"
+)
+
+CONFLICT_RE = re.compile(
+    r"不选|排除|不能|不含|没有|填不了|不填|冲突|对不上|接不上|不接|不对|错在|而不是|不是|相反|"
+    r"原文没有|文中没有|不合适|不成立|用不上|并不|干扰|改成|改为|不该|不应|不要再|"
+    r"体现不出|另一种|如果译成|如果改成|不如"
+)
+
+
+def content_words(text: str) -> set[str]:
+    return {
+        word.lower()
+        for word in re.findall(r"[A-Za-z][A-Za-z'-]{2,}", text or "")
+        if word.lower() not in SOURCE_WORD_STOP
+    }
+
+
+def teach_blank_ids(material: str) -> list[str]:
+    found: list[str] = []
+
+    def add(value: str) -> None:
+        if value and value not in found and value.isdigit() and 1 <= int(value) <= MAX_EXAM_ITEM:
+            found.append(value)
+
+    for pattern in (
+        r"\(\s*(\d{1,2})\s*\)\s*(?:_{2,}|[_.＿—–-]{2,})",
+        r"(?:^|\n)\s*(\d{1,2})\s*[.．、]\s*(?:_{2,}|[A-D]\b)",
+        r"第\s*(\d{1,2})\s*空",
+    ):
+        for match in re.finditer(pattern, material or "", flags=re.MULTILINE):
+            add(match.group(1))
+    for match in CLOZE_OPTION_GROUP_RE.finditer(material or ""):
+        add(match.group(1))
+    return found
+
+
+def _step_blob(step: dict[str, object]) -> str:
+    return " ".join(str(step.get(key) or "") for key in ("focus", "basis", "conclusion"))
+
+
+def blank_window(material: str, blank: str) -> str:
+    text = material or ""
+    for pattern in (
+        rf"\(\s*{re.escape(blank)}\s*\)",
+        rf"第\s*{re.escape(blank)}\s*空",
+        rf"(?:^|\n)\s*{re.escape(blank)}\s*[.．、]",
+    ):
+        match = re.search(pattern, text)
+        if not match:
+            continue
+        start = max(0, match.start() - 90)
+        end = min(len(text), match.end() + 90)
+        return text[start:end]
+    return text
+
+
+def names_distractor(blob: str) -> bool:
+    text = blob or ""
+    if CONFLICT_RE.search(text):
+        return True
+    articles = {item.lower() for item in re.findall(r"\b(a|an|the)\b", text, flags=re.IGNORECASE)}
+    if len(articles) >= 2:
+        return True
+    forms = {
+        item.lower()
+        for item in re.findall(r"\b(doing|done|seen|seeing|written|writing|was|were)\b", text, flags=re.IGNORECASE)
+    }
+    return len(forms) >= 2
+
+
+def step_item_nums(step: dict[str, object]) -> set[str]:
+    """Blank numbers this step is about.
+
+    The title decides. A bare 61 there counts. A bare 61 inside the explanation does not,
+    so one step cannot be treated as another blank just because it mentions that number.
+    """
+    focus = str(step.get("focus") or "")
+    nums = {str(num) for num in blank_nums_in_text(focus)}
+    bare = re.match(r"\s*(\d{1,2})\b", focus)
+    if bare and 1 <= int(bare.group(1)) <= MAX_EXAM_ITEM:
+        nums.add(bare.group(1))
+    if nums:
+        return nums
+    return {str(num) for num in blank_nums_in_text(_step_blob(step))}
+
+
+def step_targets_blank(step: dict[str, object], blank: str, steps: list[object] | None = None) -> bool:
+    """True only for this blank's own step. An untitled step counts only when it is the only step."""
+    nums = step_item_nums(step)
+    if nums:
+        return blank in nums
+    if steps is None:
+        return False
+    return sum(isinstance(item, dict) for item in steps) == 1
+
+
+def _steps_covering(steps: list[object], blank: str, single: bool) -> list[dict[str, object]]:
+    matched: list[dict[str, object]] = []
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        if blank in step_item_nums(step):
+            matched.append(step)
+    if matched:
+        return matched
+    if single:
+        return [step for step in steps if isinstance(step, dict)]
+    return []
+
+
+def blob_quotes_source(blob: str, window: str) -> bool:
+    words = content_words(window)
+    if words:
+        lowered = (blob or "").lower()
+        return any(word in lowered for word in words)
+    for chunk in re.findall(r"[\u4e00-\u9fff]{4,}", window or "")[:8]:
+        if chunk[:4] in (blob or ""):
+            return True
+    return False
+
+
+def is_translation_plus_choice(parsed: dict[str, object], material: str, blob: str) -> bool:
+    answer = str(parsed.get("answer") or "")
+    if not re.search(r"(?<![A-Za-z])[A-D](?![A-Za-z])", answer):
+        return False
+    quoted = content_words(blob) & content_words(material)
+    chinese = len(re.findall(r"[\u4e00-\u9fff]", blob or ""))
+    return chinese >= 24 and len(quoted) <= 1 and not names_distractor(blob)
+
+
+IRREGULAR_FORMS = {
+    "be": frozenset({"am", "is", "are", "was", "were", "been", "being"}),
+    "go": frozenset({"went", "gone", "goes", "going"}),
+    "do": frozenset({"did", "does", "done", "doing"}),
+    "have": frozenset({"has", "had", "having"}),
+    "see": frozenset({"saw", "seen", "sees", "seeing"}),
+    "come": frozenset({"came", "comes", "coming"}),
+    "take": frozenset({"took", "taken", "takes", "taking"}),
+    "make": frozenset({"made", "makes", "making"}),
+    "give": frozenset({"gave", "given", "gives", "giving"}),
+    "find": frozenset({"found", "finds", "finding"}),
+    "write": frozenset({"wrote", "written", "writes", "writing"}),
+    "know": frozenset({"knew", "known", "knows", "knowing"}),
+    "get": frozenset({"got", "gotten", "gets", "getting"}),
+    "say": frozenset({"said", "says", "saying"}),
+    "tell": frozenset({"told", "tells", "telling"}),
+    "speak": frozenset({"spoke", "spoken", "speaks", "speaking"}),
+    "break": frozenset({"broke", "broken", "breaks", "breaking"}),
+    "choose": frozenset({"chose", "chosen", "chooses", "choosing"}),
+    "buy": frozenset({"bought", "buys", "buying"}),
+    "bring": frozenset({"brought", "brings", "bringing"}),
+    "think": frozenset({"thought", "thinks", "thinking"}),
+    "teach": frozenset({"taught", "teaches", "teaching"}),
+    "catch": frozenset({"caught", "catches", "catching"}),
+    "seek": frozenset({"sought", "seeks", "seeking"}),
+    "sell": frozenset({"sold", "sells", "selling"}),
+    "sit": frozenset({"sat", "sits", "sitting"}),
+    "stand": frozenset({"stood", "stands", "standing"}),
+    "win": frozenset({"won", "wins", "winning"}),
+    "hold": frozenset({"held", "holds", "holding"}),
+    "lead": frozenset({"led", "leads", "leading"}),
+    "mean": frozenset({"meant", "means", "meaning"}),
+    "lose": frozenset({"lost", "loses", "losing"}),
+    "feel": frozenset({"felt", "feels", "feeling"}),
+    "keep": frozenset({"kept", "keeps", "keeping"}),
+    "leave": frozenset({"left", "leaves", "leaving"}),
+    "meet": frozenset({"met", "meets", "meeting"}),
+    "pay": frozenset({"paid", "pays", "paying"}),
+    "send": frozenset({"sent", "sends", "sending"}),
+    "run": frozenset({"ran", "runs", "running"}),
+    "eat": frozenset({"ate", "eaten", "eats", "eating"}),
+    "fall": frozenset({"fell", "fallen", "falls", "falling"}),
+    "lie": frozenset({"lay", "lain", "lies", "lying"}),
+    "bear": frozenset({"bore", "born", "borne", "bears", "bearing"}),
+    "wear": frozenset({"wore", "worn", "wears", "wearing"}),
+    "grow": frozenset({"grew", "grown", "grows", "growing"}),
+    "show": frozenset({"showed", "shown", "shows", "showing"}),
+    "draw": frozenset({"drew", "drawn", "draws", "drawing"}),
+    "fly": frozenset({"flew", "flown", "flies", "flying"}),
+    "drive": frozenset({"drove", "driven", "drives", "driving"}),
+    "ride": frozenset({"rode", "ridden", "rides", "riding"}),
+    "rise": frozenset({"rose", "risen", "rises", "rising"}),
+    "wake": frozenset({"woke", "woken", "wakes", "waking"}),
+    "begin": frozenset({"began", "begun", "begins", "beginning"}),
+}
+
+
+def shares_stem(cue: str, token: str) -> bool:
+    """True when token is a regular form of cue: built/build, visibility/visible, themes/theme."""
+    cue = (cue or "").lower()
+    token = (token or "").lower()
+    if not cue or not token:
+        return False
+    if token == cue or token.startswith(cue):
+        return True
+    stem = cue[:-1] if cue.endswith("e") and len(cue) > 4 else cue
+    head = stem[:4]
+    return len(head) >= 4 and token.startswith(head)
+
+
+def text_uses_cue(text: str, cue: str) -> bool:
+    forms = IRREGULAR_FORMS.get((cue or "").lower(), frozenset())
+    for token in re.findall(r"[A-Za-z']+", text or ""):
+        low = token.lower()
+        if low in forms or shares_stem(cue, low):
+            return True
+    return False
+
+
+def cued_blank_job_notes(parsed: dict[str, object], material: str) -> list[str]:
+    """A parenthetical hint must be explained as a form of that word, whatever the other rule was."""
+    steps = parsed.get("reasoning_steps")
+    if not isinstance(steps, list):
+        return []
+    notes: list[str] = []
+    for match in CUED_HINT_RE.finditer(material or ""):
+        blank, cue = match.group(1), match.group(2)
+        covered = _steps_covering(steps, blank, False)
+        if not covered:
+            continue
+        blob = " ".join(_step_blob(step) for step in covered)
+        if text_uses_cue(blob, cue):
+            continue
+        notes.append(f"空{blank}的提示词是 {cue}，这一步没有讲这个词的形式")
+    return notes
+
+
+def cued_blank_article_notes(parsed: dict[str, object], material: str) -> list[str]:
+    return cued_blank_job_notes(parsed, material)
+
+
+def grounding_gap_notes(parsed: dict[str, object], material: str) -> list[str]:
+    """Name the blank that failed, so the next respond can fix that step."""
+    if not isinstance(parsed, dict):
+        return ["没有按空写步骤"]
+    steps = parsed.get("reasoning_steps")
+    if not isinstance(steps, list) or not any(isinstance(step, dict) for step in steps):
+        return ["没有按空写步骤"]
+    blanks = teach_blank_ids(material)
+    notes: list[str] = []
+    if not blanks:
+        blob = " ".join(_step_blob(step) for step in steps if isinstance(step, dict))
+        if not blob_quotes_source(blob, material):
+            notes.append("整题没有照抄原句里的词")
+        if not names_distractor(blob):
+            notes.append("整题没有写被排除的一项")
+        return notes
+    single = len(blanks) == 1
+    for blank in blanks:
+        covered = _steps_covering(steps, blank, single)
+        label = f"空{blank}"
+        if not covered:
+            notes.append(f"{label}没有单独的一步")
+            continue
+        blob = " ".join(_step_blob(step) for step in covered)
+        window = blank_window(material, blank)
+        if not blob_quotes_source(blob, window):
+            notes.append(f"{label}没有照抄原句里的词")
+        if not names_distractor(blob):
+            notes.append(f"{label}没有写被排除的一项和冲突")
+    notes.extend(cued_blank_job_notes(parsed, material))
+    return notes
+
+
+def rewrite_instruction(parsed: dict[str, object] | None, material: str) -> str:
+    """Ask for a new explanation of the weak blank. Do not hand the model a sentence to copy."""
+    lines = [
+        "上一讲没有把这个空讲清楚。丢掉上一讲，对着原句重写。",
+        "每一空写成三句：这个空在这句里充当什么。哪几个原词决定它。被排除的形式为什么和这些词接不上。",
+        "括号里有提示词时，结论必须是这个词的一种形式。不要改讲冠词、介词或另一个空。",
+        "不要翻译整句，不要复述情节，不要只写「排除某词，冲突，所以填答案」。",
+    ]
+    steps = parsed.get("reasoning_steps") if isinstance(parsed, dict) else None
+    steps = steps if isinstance(steps, list) else []
+    blanks = teach_blank_ids(material)
+    single = len(blanks) == 1
+    gaps = grounding_gap_notes(parsed, material) if isinstance(parsed, dict) else []
+    job_ids: list[str] = []
+    other_ids: list[str] = []
+    for note in gaps:
+        match = re.search(r"空(\d{1,2})", note)
+        if not match:
+            continue
+        bucket = job_ids if "提示词" in note else other_ids
+        if match.group(1) not in job_ids and match.group(1) not in other_ids:
+            bucket.append(match.group(1))
+    targets = (job_ids + other_ids) or blanks or [""]
+    for blank in targets[:4]:
+        if blank:
+            covered = _steps_covering(steps, blank, single)
+            window = blank_window(material, blank)
+            label = f"空{blank}"
+        else:
+            covered = [step for step in steps if isinstance(step, dict)]
+            window = material
+            label = "这一题"
+        window = re.sub(r"\s+", " ", window or "").strip()
+        if window:
+            lines.append(f"{label}的原句：{window[:180]}")
+        if covered and isinstance(covered[0], dict):
+            weak = str(covered[0].get("basis") or "").strip()
+            if weak:
+                lines.append(f"上一讲只写了：{weak[:160]}")
+    if gaps:
+        ranked = [note for note in gaps if "提示词" in note] + [note for note in gaps if "提示词" not in note]
+        lines.append("还没讲清：" + "；".join(ranked[:4]) + "。")
+    lines.append("不要输出 JSON。")
+    return "\n".join(lines)
+
+
+def grounding_score(parsed: dict[str, object] | None, material: str) -> int:
+    """How many blanks already quote the sentence and name a rejection."""
+    if not isinstance(parsed, dict):
+        return -1
+    steps = parsed.get("reasoning_steps")
+    if not isinstance(steps, list):
+        return 0
+    blanks = teach_blank_ids(material)
+    if not blanks:
+        blob = " ".join(_step_blob(step) for step in steps if isinstance(step, dict))
+        quoted = blob_quotes_source(blob, material)
+        rejected = names_distractor(blob)
+        return int(quoted) + int(rejected)
+    single = len(blanks) == 1
+    score = 0
+    for blank in blanks:
+        covered = _steps_covering(steps, blank, single)
+        if not covered:
+            continue
+        blob = " ".join(_step_blob(step) for step in covered)
+        window = blank_window(material, blank)
+        if blob_quotes_source(blob, window):
+            score += 1
+        if names_distractor(blob):
+            score += 1
+    return score
+
+
+def explanation_needs_reteach(parsed: dict[str, object], material: str) -> bool:
+    """True when a step is only a translation plus a letter, or misses the sentence and a conflict."""
+    if not isinstance(parsed, dict):
+        return False
+    if str(parsed.get("answer") or "").strip() == "需要确认":
+        return False
+    if not has_enough_question_material(material):
+        return False
+    steps = parsed.get("reasoning_steps")
+    if not isinstance(steps, list) or not any(isinstance(step, dict) for step in steps):
+        return True
+    if cued_blank_job_notes(parsed, material):
+        return True
+    blanks = teach_blank_ids(material)
+    if not blanks:
+        blob = " ".join(_step_blob(step) for step in steps if isinstance(step, dict))
+        if not blob_quotes_source(blob, material) or not names_distractor(blob):
+            return True
+        return is_translation_plus_choice(parsed, material, blob)
+    single = len(blanks) == 1
+    for blank in blanks:
+        covered = _steps_covering(steps, blank, single)
+        if not covered:
+            return True
+        blob = " ".join(_step_blob(step) for step in covered)
+        window = blank_window(material, blank)
+        if not blob_quotes_source(blob, window) or not names_distractor(blob):
+            return True
+    whole = " ".join(_step_blob(step) for step in steps if isinstance(step, dict))
+    return is_translation_plus_choice(parsed, material, whole)
+
+
+def reteach_nudge(
+    reply: str,
+    message: str,
+    image_context: str | None = None,
+    prior_context: str = "",
+) -> str:
+    parts: list[str] = []
+    if reply_dodges_present_material(reply, message, image_context, prior_context):
+        parts.append(PRESENT_MATERIAL_NUDGE)
+    material = teaching_material(message, image_context)
+    parsed = parse_structured_reply(reply)
+    if parsed is None and has_enough_question_material(message, image_context, prior_context):
+        parts.append(GROUNDING_NUDGE)
+    elif isinstance(parsed, dict) and explanation_needs_reteach(parsed, material):
+        parts.append(GROUNDING_NUDGE)
+    return "\n".join(parts)
+
+
+def choose_reteach_reply(
+    first: str,
+    second: str,
+    message: str,
+    image_context: str | None = None,
+    prior_context: str = "",
+) -> str:
+    if not (second or "").strip():
+        return first
+    first_dodge = reply_dodges_present_material(first, message, image_context, prior_context)
+    second_dodge = reply_dodges_present_material(second, message, image_context, prior_context)
+    if first_dodge and not second_dodge:
+        return second
+    if second_dodge and not first_dodge:
+        return first
+    material = teaching_material(message, image_context)
+    first_parsed = parse_structured_reply(first)
+    second_parsed = parse_structured_reply(second)
+    first_bad = first_parsed is None or explanation_needs_reteach(first_parsed, material)
+    second_bad = second_parsed is None or explanation_needs_reteach(second_parsed, material)
+    if first_bad and not second_bad:
+        return second
+    if second_bad and not first_bad:
+        return first
+    if first_bad and second_bad:
+        if grounding_score(first_parsed, material) > grounding_score(second_parsed, material):
+            return first
+    return second
+
+
+REASON_PRESENT_NUDGE = (
+    "题目原文已经在上一条学生消息里。不要写需要确认，不要让学生重发。"
+    "按空重写，每空三句：这个空在这句里充当什么。哪几个原词决定它。被排除的形式为什么接不上。括号里有提示词就只讲这个词。不要输出 JSON。"
+)
+
+
+def answer_text(content: str, thinking: str) -> str:
+    """DeepSeek may leave the draft in the thinking channel and content empty."""
+    return (content or "").strip() or (thinking or "").strip()
+
+
+def _is_planning_monologue(text: str) -> bool:
+    """Model notes about the task are not a lecture the student should see."""
+    return bool(re.search(r"我们需要|需要回答用户|需要看用户", text or ""))
+
+
+def reason_prose(content: str, thinking: str, material: str) -> str:
+    """Use the channel that already quotes the sentence and names a rejected option."""
+    content = (content or "").strip()
+    thinking = (thinking or "").strip()
+
+    def usable(text: str) -> bool:
+        if _is_planning_monologue(text):
+            return False
+        return bool(text) and blob_quotes_source(text, material) and names_distractor(text)
+
+    if usable(content):
+        return content
+    if usable(thinking):
+        return thinking
+    combined = f"{thinking}\n{content}".strip()
+    if usable(combined):
+        return combined
+    if content and blob_quotes_source(content, material) and not _is_planning_monologue(content):
+        return content
+    return content or thinking
+
+
+def reason_stage_nudge(
+    reply: str,
+    message: str,
+    image_context: str | None = None,
+    prior_context: str = "",
+) -> str:
+    raw = reteach_nudge(reply, message, image_context, prior_context)
+    if not raw:
+        return ""
+    parts: list[str] = []
+    if PRESENT_MATERIAL_NUDGE in raw:
+        parts.append(REASON_PRESENT_NUDGE)
+    if GROUNDING_NUDGE in raw:
+        parsed = parse_structured_reply(reply)
+        material = teaching_material(message, image_context)
+        parts.append(rewrite_instruction(parsed if isinstance(parsed, dict) else None, material))
+    return "\n".join(parts)
+
+
+def explain_once(
+    client: OpenAI,
+    model: str,
+    message: str,
+    history: list[ChatMessage],
+    question_type: str,
+    material: str,
+    nudge: str = "",
+) -> str:
+    """One respond: teach this blank. The JSON contract is not in this prompt."""
+    messages = build_text_messages(message, history, question_type, material)
+    if nudge:
+        messages.append({"role": "user", "content": nudge})
+    content, thinking = complete_chat(
+        client,
+        model,
+        messages,
+        temperature=0.2,
+        enable_thinking=reason_thinking_enabled(model),
+    )
+    return reason_prose(content, thinking, material)
+
+
+def format_once(
+    client: OpenAI,
+    model: str,
+    question_type: str,
+    material: str,
+    prose: str,
+) -> str:
+    """One respond: pack the prose into JSON. Thinking stays off so JSON lands in content."""
+    content, thinking = complete_chat(
+        client,
+        model,
+        build_format_messages(question_type, material, prose),
+        temperature=0,
+        enable_thinking=False,
+    )
+    return answer_text(content, thinking)
+
+
+def staged_teach_reply(
+    client: OpenAI,
+    model: str,
+    message: str,
+    history: list[ChatMessage],
+    question_type: str,
+    image_context: str | None,
+    prior_context: str = "",
+) -> tuple[str, str]:
+    """Reason, then format. If the JSON is ungrounded, reason and format once more."""
+    material = teaching_material(message, image_context)
+    logger.info("teach stage=reason type=%s model=%s", question_type, model)
+    prose = explain_once(client, model, message, history, question_type, material)
+    logger.info("teach stage=format type=%s", question_type)
+    reply, thinking = finalize_structured_reply(
+        format_once(client, model, question_type, material, prose),
+        prose,
+        message,
+        image_context,
+        prior_context,
+    )
+    nudge = reason_stage_nudge(reply, message, image_context, prior_context)
+    if not nudge:
+        return reply, thinking
+    logger.info("teach stage=repair type=%s", question_type)
+    repaired = explain_once(client, model, message, history, question_type, material, nudge)
+    repaired_reply, repaired_thinking = finalize_structured_reply(
+        format_once(client, model, question_type, material, repaired),
+        repaired,
+        message,
+        image_context,
+        prior_context,
+    )
+    chosen = choose_reteach_reply(reply, repaired_reply, message, image_context, prior_context)
+    if chosen == repaired_reply:
+        return repaired_reply, repaired_thinking
+    return reply, thinking
+
+
+def finalize_structured_reply(
+    reply: str,
+    raw_thinking: str,
+    source_message: str,
+    image_context: str | None = None,
+    prior_context: str = "",
+) -> tuple[str, str]:
+    rule_text = teaching_material(source_message, image_context)
+    reply = normalize_structured_reply(
+        reply,
+        message=rule_text,
+        image_context=image_context,
+        prior_context=prior_context,
+    )
+    final_thinking = sanitize_thinking_text(raw_thinking)
+    final_thinking = scrub_echoed_thinking(final_thinking, rule_text)
+    final_thinking = align_article_thinking(final_thinking, rule_text)
+    final_thinking = align_fronted_passive_thinking(final_thinking, rule_text)
+    if not final_thinking:
+        final_thinking = thinking_from_structured_reply(reply)
+    if final_thinking:
+        reply = merge_thinking_into_structured_reply(reply, final_thinking)
+    polished = parse_structured_reply(reply)
+    if polished:
+        apply_answer_corrections(polished, rule_text)
+        reply = json.dumps(polished, ensure_ascii=False)
+        parsed_reply = parse_structured_reply(reply)
+        if parsed_reply:
+            scrub_parsed_rule_indexes(parsed_reply)
+            steps = parsed_reply.get("reasoning_steps")
+            if isinstance(steps, list):
+                for step in steps:
+                    if not isinstance(step, dict):
+                        continue
+                    for key in ("focus", "basis", "conclusion"):
+                        step[key] = scrub_meta_teaching_lines(str(step.get(key) or ""))
+            reply = json.dumps(parsed_reply, ensure_ascii=False)
+    return reply, final_thinking
+
+
+def iter_staged_teach_events(
+    client: OpenAI,
+    *,
+    model: str,
+    message: str,
+    history: list[ChatMessage],
+    question_type: str,
+    image_context: str | None,
+    prior_context: str,
+    meta: ModelMeta,
+):
+    material = teaching_material(message, image_context)
+    logger.info("teach stage=reason type=%s model=%s", question_type, model)
+    prose = explain_once(client, model, message, history, question_type, material)
+    yield sse_event({"type": "status", "stage": "teach", "text": "整理成答案"})
+    logger.info("teach stage=format type=%s", question_type)
+    reply, final_thinking = finalize_structured_reply(
+        format_once(client, model, question_type, material, prose),
+        prose,
+        message,
+        image_context,
+        prior_context,
+    )
+    nudge = reason_stage_nudge(reply, message, image_context, prior_context)
+    if nudge:
+        status = "没贴住原句，再讲一次" if "不合格" in nudge else "题目已经在，继续讲"
+        yield sse_event({"type": "status", "stage": "teach", "text": status})
+        logger.info("teach stage=repair type=%s", question_type)
+        repaired = explain_once(client, model, message, history, question_type, material, nudge)
+        repaired_reply, repaired_thinking = finalize_structured_reply(
+            format_once(client, model, question_type, material, repaired),
+            repaired,
+            message,
+            image_context,
+            prior_context,
+        )
+        chosen = choose_reteach_reply(reply, repaired_reply, message, image_context, prior_context)
+        if chosen == repaired_reply:
+            reply, final_thinking = repaired_reply, repaired_thinking
+    done_payload: dict[str, object] = {"type": "done", "reply": reply, "meta": meta.model_dump()}
+    if final_thinking:
+        done_payload["thinking"] = final_thinking
+    if image_context:
+        done_payload["ocr_text"] = image_context
+        stem = extract_question_stem(image_context, message)
+        if stem:
+            done_payload["ocr_stem"] = stem
+    yield sse_event(done_payload)
 
 
 def iter_forced_reply_events(reply: str, meta: ModelMeta, thinking: str | None = None):
@@ -1725,20 +3353,22 @@ def iter_completion_deltas(
         "messages": messages,
         "stream": True,
         "max_tokens": 8192,
+        "extra_body": {"enable_thinking": True, "thinking_budget": 8192} if enable_thinking else {"enable_thinking": False},
     }
-    if enable_thinking:
-        kwargs["extra_body"] = {"enable_thinking": True, "thinking_budget": 8192}
 
     try:
         stream = client.chat.completions.create(**kwargs)
     except Exception:
-        if not enable_thinking:
-            raise
-        kwargs["extra_body"] = {"enable_thinking": True}
-        try:
-            stream = client.chat.completions.create(**kwargs)
-        except Exception:
-            logger.exception("Thinking stream failed, retrying without thinking")
+        if enable_thinking:
+            kwargs["extra_body"] = {"enable_thinking": True}
+            try:
+                stream = client.chat.completions.create(**kwargs)
+            except Exception:
+                logger.exception("Thinking stream failed, retrying without thinking")
+                kwargs.pop("extra_body", None)
+                stream = client.chat.completions.create(**kwargs)
+        else:
+            logger.exception("Stream extras were rejected, retrying without them")
             kwargs.pop("extra_body", None)
             stream = client.chat.completions.create(**kwargs)
 
@@ -1816,18 +3446,60 @@ def iter_streamed_reply_events(
         reply = non_stream_fallback()
         if reply:
             yield sse_event({"type": "content", "text": reply})
+    nudge = reteach_nudge(reply, source_message, image_context, prior_context)
+    if nudge:
+        logger.warning("teach stage=reteach")
+        status = "没贴住原句，再讲一次" if "不合格" in nudge else "题目已经在，继续讲"
+        yield sse_event({"type": "status", "stage": "analyze", "text": status})
+        retry_parts: list[str] = []
+        retry_thinking = ""
+        try:
+            for reasoning, content in iter_completion_deltas(
+                client,
+                model=model,
+                messages=[*messages, {"role": "user", "content": nudge}],
+                temperature=temperature,
+                enable_thinking=enable_thinking,
+            ):
+                if reasoning:
+                    retry_thinking += reasoning
+                if content:
+                    retry_parts.append(content)
+        except Exception:
+            logger.exception("Reteach respond failed")
+        else:
+            retry_reply = "".join(retry_parts).strip()
+            chosen = choose_reteach_reply(
+                reply,
+                retry_reply,
+                source_message,
+                image_context,
+                prior_context,
+            )
+            if chosen == retry_reply:
+                reply = retry_reply
+                if retry_thinking:
+                    raw_thinking = retry_thinking
 
+    rule_text = teaching_material(source_message, image_context)
     reply = normalize_structured_reply(
         reply,
-        message=source_message,
+        message=rule_text,
         image_context=image_context,
         prior_context=prior_context,
     )
     final_thinking = sanitize_thinking_text(raw_thinking) or emitted_thinking
+    final_thinking = scrub_echoed_thinking(final_thinking, rule_text)
+    final_thinking = align_article_thinking(final_thinking, rule_text)
+    final_thinking = align_fronted_passive_thinking(final_thinking, rule_text)
     if not final_thinking:
         final_thinking = thinking_from_structured_reply(reply)
     if final_thinking:
         reply = merge_thinking_into_structured_reply(reply, final_thinking)
+    polished = parse_structured_reply(reply)
+    if polished:
+        apply_answer_corrections(polished, rule_text)
+        reply = json.dumps(polished, ensure_ascii=False)
         parsed_reply = parse_structured_reply(reply)
         if parsed_reply:
             scrub_parsed_rule_indexes(parsed_reply)
@@ -1875,72 +3547,73 @@ def iter_chat_sse(request: ChatRequest):
         return
 
     try:
+        ocr_text: str | None = None
+        used_vision = False
+        route: Literal["text", "vision", "ocr_plus_vision"] = "text"
         if request.latest_image is not None:
-            ocr_text = None
-            route: Literal["vision", "ocr_plus_vision"] = "vision"
+            route = "vision"
             if request.use_ocr_first:
                 route = "ocr_plus_vision"
                 yield sse_event({"type": "status", "stage": "ocr", "text": "先把图片里的字认出来"})
                 ocr_text = extract_ocr_text(client, request.latest_image, ocr_model)
                 if ocr_text:
                     yield sse_event({"type": "ocr", "text": ocr_text})
+            if not has_enough_question_material(request.message, ocr_text):
+                yield sse_event({"type": "status", "stage": "ocr", "text": "再把题目抄出来"})
+                transcript = transcribe_question_image(client, request.latest_image, vision_model)
+                used_vision = True
+                if transcript:
+                    ocr_text = transcript
+                    yield sse_event({"type": "ocr", "text": ocr_text})
             forced = deterministic_structured_reply(request.message, ocr_text)
-            meta = ModelMeta(
-                route=route,
-                provider=settings.provider_name,
-                vision_model=vision_model,
-                ocr_model=ocr_model if route == "ocr_plus_vision" else None,
-            )
             if forced:
+                meta = ModelMeta(
+                    route=route,
+                    provider=settings.provider_name,
+                    text_model=text_model,
+                    vision_model=vision_model if used_vision else None,
+                    ocr_model=ocr_model if request.use_ocr_first else None,
+                )
                 yield from iter_forced_reply_events(forced, meta)
                 return
-            yield sse_event({"type": "status", "stage": "analyze", "text": "先把图里的题目看清楚"})
-            yield from iter_streamed_reply_events(
-                client,
-                model=vision_model,
-                messages=build_vision_messages(
-                    request.message,
-                    request.history,
-                    request.latest_image,
-                    ocr_text=ocr_text,
-                ),
-                temperature=0.7,
-                enable_thinking=model_supports_thinking(vision_model),
-                meta=meta,
-                non_stream_fallback=lambda: generate_vision_reply(
-                    client,
-                    request.message,
-                    request.history,
-                    request.latest_image,
-                    vision_model,
-                    ocr_text=ocr_text,
-                ),
-                source_message=request.message,
-                image_context=ocr_text,
-                prior_context="\n".join(item.content for item in request.history if item.sender == "user"),
-            )
-            return
 
-        forced = deterministic_structured_reply(request.message)
+        else:
+            forced = deterministic_structured_reply(request.message)
+            if forced:
+                meta = ModelMeta(
+                    route="text",
+                    provider=settings.provider_name,
+                    text_model=text_model,
+                )
+                yield from iter_forced_reply_events(forced, meta)
+                return
+
+        prior_context = "\n".join(item.content for item in request.history if item.sender == "user")
+        yield sse_event({"type": "status", "stage": "classify", "text": "先判断题型"})
+        question_type = resolve_question_type(
+            client,
+            text_model,
+            request.message,
+            request.history,
+            ocr_text,
+        )
+        yield sse_event({"type": "status", "stage": "teach", "text": f"按{question_type}讲"})
         meta = ModelMeta(
-            route="text",
+            route=route,
             provider=settings.provider_name,
             text_model=text_model,
+            vision_model=vision_model if used_vision else None,
+            ocr_model=ocr_model if request.latest_image is not None and request.use_ocr_first else None,
         )
-        if forced:
-            yield from iter_forced_reply_events(forced, meta)
-            return
-        yield sse_event({"type": "status", "stage": "analyze", "text": "正在思考"})
-        yield from iter_streamed_reply_events(
+        yield from iter_staged_teach_events(
             client,
             model=text_model,
-            messages=build_text_messages(request.message, request.history),
-            temperature=0.5,
-            enable_thinking=model_supports_thinking(text_model),
+            message=request.message,
+            history=request.history,
+            question_type=question_type,
+            image_context=ocr_text,
+            prior_context=prior_context,
             meta=meta,
-            non_stream_fallback=lambda: generate_text_reply(client, request.message, request.history, text_model),
-            source_message=request.message,
-            prior_context="\n".join(item.content for item in request.history if item.sender == "user"),
         )
     except Exception:  # noqa: BLE001
         logger.exception("Streaming model pipeline failed, fallback to demo reply")
@@ -1948,110 +3621,49 @@ def iter_chat_sse(request: ChatRequest):
         yield demo_done()
 
 
-def run_model_pipeline(request: ChatRequest) -> ChatResponse:
-    settings = get_model_settings()
-    client = get_openai_client()
-    text_model = request.preferred_text_model or settings.text_model
-    vision_model = request.preferred_vision_model or settings.vision_model
-    ocr_model = request.preferred_ocr_model or settings.ocr_model
-
-    if client is None:
-        route = "ocr_plus_vision" if request.latest_image and request.use_ocr_first else "vision" if request.latest_image else "demo"
-        return ChatResponse(
-            reply=build_demo_reply(request.message, request.history, request.latest_image),
-            meta=ModelMeta(
-                route=route if route != "demo" else "demo",
-                provider=settings.provider_name,
-                text_model=text_model,
-                vision_model=vision_model,
-                ocr_model=ocr_model,
-                used_demo_fallback=True,
-            ),
-        )
-
+def _parse_sse_payload(chunk: str) -> dict[str, object] | None:
+    data = "\n".join(line[5:].strip() for line in chunk.splitlines() if line.startswith("data:")).strip()
+    if not data:
+        return None
     try:
-        if request.latest_image is not None:
-            ocr_text = None
-            route: Literal["vision", "ocr_plus_vision"] = "vision"
-            if request.use_ocr_first:
-                route = "ocr_plus_vision"
-                ocr_text = extract_ocr_text(client, request.latest_image, ocr_model)
-            forced = deterministic_structured_reply(request.message, ocr_text)
-            if forced:
-                return ChatResponse(
-                    reply=forced,
-                    meta=ModelMeta(
-                        route=route,
-                        provider=settings.provider_name,
-                        vision_model=vision_model,
-                        ocr_model=ocr_model if route == "ocr_plus_vision" else None,
-                    ),
-                    ocr_text=ocr_text,
-                    ocr_stem=extract_question_stem(ocr_text or "", request.message) or None,
-                )
-            reply = generate_vision_reply(
-                client,
-                request.message,
-                request.history,
-                request.latest_image,
-                vision_model,
-                ocr_text=ocr_text,
-            )
-            reply = normalize_structured_reply(
-                reply,
-                message=request.message,
-                image_context=ocr_text,
-                prior_context="\n".join(item.content for item in request.history if item.sender == "user"),
-            )
-            return ChatResponse(
-                reply=reply,
-                meta=ModelMeta(
-                    route=route,
-                    provider=settings.provider_name,
-                    vision_model=vision_model,
-                    ocr_model=ocr_model if route == "ocr_plus_vision" else None,
-                ),
-                ocr_text=ocr_text,
-                ocr_stem=extract_question_stem(ocr_text or "", request.message) or None,
-            )
+        payload = json.loads(data)
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
 
-        forced = deterministic_structured_reply(request.message)
-        if forced:
-            return ChatResponse(
-                reply=forced,
-                meta=ModelMeta(
-                    route="text",
-                    provider=settings.provider_name,
-                    text_model=text_model,
-                ),
-            )
-        reply = generate_text_reply(client, request.message, request.history, text_model)
-        reply = normalize_structured_reply(
-            reply,
-            message=request.message,
-            prior_context="\n".join(item.content for item in request.history if item.sender == "user"),
-        )
-        return ChatResponse(
-            reply=reply,
-            meta=ModelMeta(
-                route="text",
-                provider=settings.provider_name,
-                text_model=text_model,
-            ),
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Model pipeline failed, fallback to demo reply")
+
+def run_model_pipeline(request: ChatRequest) -> ChatResponse:
+    """Same task states as the stream: classify, teach, then at most one reteach."""
+    done: dict[str, object] | None = None
+    for chunk in iter_chat_sse(request):
+        payload = _parse_sse_payload(chunk)
+        if payload and payload.get("type") == "done":
+            done = payload
+    settings = get_model_settings()
+    if not done:
         return ChatResponse(
             reply=build_demo_reply(request.message, request.history, request.latest_image),
             meta=ModelMeta(
                 route="demo",
                 provider=settings.provider_name,
-                text_model=text_model,
-                vision_model=vision_model,
-                ocr_model=ocr_model,
+                text_model=settings.text_model,
                 used_demo_fallback=True,
             ),
         )
+    meta_raw = done.get("meta")
+    meta = ModelMeta.model_validate(meta_raw) if isinstance(meta_raw, dict) else ModelMeta(
+        route="demo",
+        provider=settings.provider_name,
+        used_demo_fallback=True,
+    )
+    ocr_text = done.get("ocr_text")
+    ocr_stem = done.get("ocr_stem")
+    return ChatResponse(
+        reply=str(done.get("reply") or ""),
+        meta=meta,
+        ocr_text=ocr_text if isinstance(ocr_text, str) else None,
+        ocr_stem=ocr_stem if isinstance(ocr_stem, str) else None,
+    )
 
 
 @app.get("/health")
