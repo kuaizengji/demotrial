@@ -100,6 +100,19 @@ however、therefore、thus 不能连接两个句子。for 加一段时间本身�
 连词：看空格两边的句子是转折、因果、条件、并列，还是时间先后。
 记叙文的起承转合只用来核对情感方向，不能用来跳过这个空。
 不要把原句译成中文再贴选项字母。
+同句既有名词空又有动词空，先做名词。当前句还没写出这个人做什么，到后文主题再定这一空。专有名词一多，按人名、地名、动物名分开，再判断谁能和谁碰面。完形不要和长难句缠斗：这一空要什么词性，就只看对应、顺序或态度。
+冒号、such、that 同位语、引号里的句子，后面往往就是这个名词的对应。additional 说明同类东西已经给过，还要更多。机构职能先对上，如收容所对 adoption。文章若给人物定性，后文必须有具体举动，先看下一句再选形容词。
+正态度词不能描述负面事物本身。否定句叠负态度形容词，结果变成正。however / but 前若要负、后是正，前面应否定一个正态度词。并列一串正态度再出现 less，less 后必须是负态度名词。when 只表时间，没有转折；when 从句里「没有注意到 X」要造成负面，X 必须是正的。mix / 混合要求两边一正一负。nobody / no 后若要负结果，应否定正态度词。good / bad 比 new / easy 更笼统，同时出现时先看笼统项。完形末尾不要优先选负态度。否定「只看外观」之后，不要再选 size / shape / color。look 和 taste 对照时，一边外观、一边内在。
+空后直接逗号的独立副词，考上下文逻辑。then again 表并列，两句常常一层精神、一层物质。to be honest、suddenly 常引出相反语气或性质。to one's surprise 由后文实事决定；负转正常经中性过渡。even though 要让步，后半不能和前半的希望重复。even 加比较级是递进，态度与已写形容词同向。感叹号要求选项语气够强。首段总括、后段事例，每空都要对回主题。缺席的时间方向要和「时日无多」一致：缺的是未来，不是已经参与的过去。
+动词带着固定介词，先还原整个短语，再看发出者有没有资格、对象接不接得上。信息类动词分清接收方：被联系的一方不能选 send / forward / deliver。check out 是看；comment on 在看完之后。confirm 从不确定到确定；remove / relieve / overcome 加负面对象是消除负面。train 接实际动作，不接 how to。fill 补上本来该有、现在缺的角色；create 是从无到有。might not otherwise：没有前面那个动作，后面本来不会发生。spare A B：免去 A 遭受 B。and 连连续动作时，前后不能是同一件事。share 必须涉及别人；accept / expect / celebrate 可以一个人做完。grow 可以同时管两头从无到有。令人意外的动作，选这个人最不像会做的那一个。方位与原文一致：人在前方，就不能折回去帮。结构看不清时，用 together 一类状态副词倒推动词。
+人物身份必须接上主题。人物心理必须落到已经写出的话或动作上。remind 不要求地位差；allow / order 一方高于另一方；persuade 用于对方本来不接受。距离已近用 bring，不用 send。有问必有答，且不能答非所问。
+与主题、身份完全无关的项当凑数项去掉。不认识的正确项，先排三个对象不合格的熟词。同一篇正规完形，两个正确项不会是同一个词。quite / as 可先拿掉，盯被修饰的词。too（也）与前文态度同向。
+unfortunately 由正折到负。admittedly 先承认、后面常转。seemingly 只是表面。instead 独立使用时表转折。actually 是表象背后的真实；possibly 太不确定，撑不住「希望如此」。ultimately 表发展结果，兼因果。rather than 肯定前、否定后；thanks to 引原因；regardless of 不受影响；apart from 并列另一项。be 没有动作时，副词看整句。习语先看字面正负：over the moon 偏正，under a cloud、at a loss 偏负。
+get + done：主语是承受者。so that 后面是目的，不能填损坏、抛弃。especially 是递进，后半更难或更极端。stick with：条件允许时坚持。come across：偶然看到。blow up：短时间爆火。offer to do：主动伸手。pick up：物=捡起，人=接上，技能=学会，状态=重拾。work out：问题得到解决。make one's way：单纯前往。struggle to do：吃力。settle 是长期安顿，才能和短期 travel 转折。keep sb from doing：让某人做不成。try out：海选。locate：确定位置。maintain：让已有之物保持可用。discover 是让客观存在从未知到已知；自己做完的结果不宜说「发现做好了」。
+形式主语整套看：It happens that 是碰巧、两事无因果；It appears that 是主观印象；It proves that 是已验证结论。it is + adj + to do：形容词描述那件事，不是 it。there's no reason why not 等于这种情况不可能不成立，常是鼓励。情态动词 + have done 一定指过去：must / might 是推测，should / need 是虚拟，could 两种都有。should have done：本该发生、实际没有。when 突发：过去进行铺背景，一般过去点突发。
+copy 是相同内容的每一份；version / original 不能论「五百万个」。practice 必须真的去做；plan 只定计划不够。wisdom 是个人感悟；truth 是客观原理。follower 是关注之后的粉丝。response 是有问才有答。belonging 是家里还在用的；giveaway / contribution 是给出去的。reminder 是本来知道、被再强调；discovery 是第一次出现。hold 要看对象。meet 作名词是体育比赛；见面的名词是 meeting。display of kindness 是让人看见的善；exchange 必须双向。gesture 是为表达意图做的动作。credit：信用、学分、赞扬。
+advanced 写疾病是晚期。particular 写人是挑剔，偏负。enthusiastic 是正态度，否定它才是不感兴趣。simple 和 not easy 可以转折。familiar 要能引出后文。encouraged：有正面反馈才有动力接着做。virtual：不是当面。priceless 是自身珍贵；beneficial 是对别人有好处。seem + adj 描述当时性质；有 suddenly 则与前文反转。写动物若带情感，可用 she / her。
+post 表示在网上发布，名词即帖子。follow / give a like / blow up 是常考网络动作。定语从句里先行词作宾语，that 可省。stand out 必须有平庸对照。
 
 <!-- block: 阅读 -->
 细节题先定位：题干里的词对应到哪一句，再看哪个选项和那一句是同一件事。
