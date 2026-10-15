@@ -35,8 +35,11 @@ def test_prompt_is_split_by_type() -> None:
     assert "起承转合" in cloze
     assert "一个句子只能有一个谓语" in grammar
     assert "一个句子只能有一个谓语" not in cloze
+    assert "先看这个空" in grammar
+    assert "先看这个空" in cloze
+    assert "先看这个空" not in reading
+    assert "一题只写一遍" in reading
     assert "细节题先定位" in reading
-    assert "起承转合" not in reading
     seen_shapes = ("university", "spent my childhood", "紧张的表现", "(see/hear", "her scarf")
     cards = [system_text(name) for name in app.KNOWN_QUESTION_TYPES]
     for text in cards:
@@ -45,7 +48,12 @@ def test_prompt_is_split_by_type() -> None:
         for shape in seen_shapes:
             assert shape not in text
         assert "<!-- block:" not in text
-        assert "先看这个空" in text
+    assert "先看这个空" not in reading
+    reading_user = app.build_text_messages("阅读理解", [], question_type="阅读")[-1]["content"]
+    grammar_user = app.build_text_messages("语法填空", [], question_type="语法")[-1]["content"]
+    assert "充当什么" not in reading_user
+    assert "不要回到前面" in reading_user
+    assert "充当什么" in grammar_user
     assert "谓语" in system_text("长难句")
     assert "搭配" in system_text("词汇")
     assert "起承转合" not in system_text("长难句")
@@ -423,6 +431,53 @@ def test_duplicate_step_for_the_same_item_is_dropped() -> None:
     assert parsed["reasoning_steps"][0]["conclusion"] == "A"
 
 
+def test_reading_items_are_not_explained_twice() -> None:
+    parsed = {
+        "answer": "21. 需要确认\n22. 需要确认\n23. C",
+        "need_more_context": True,
+        "reasoning_steps": [
+            {
+                "focus": "第21题",
+                "basis": "这一空需要文章前部赛程信息。决定它的原词未出现在所给材料中。被排除项因缺少定位句无法判断。",
+                "conclusion": "需要确认",
+            },
+            {
+                "focus": "第22题",
+                "basis": "这一空需要文章前部酒店距离信息。决定它的原词未出现在所给材料中。被排除项因缺少定位句无法判断。",
+                "conclusion": "需要确认",
+            },
+            {
+                "focus": "第23题",
+                "basis": "这一空充当停车条件。决定它的原词是 download your parking pass。被排除项A错在原文是进入后引导。",
+                "conclusion": "C. Obtain a parking pass",
+            },
+            {
+                "focus": "第21题",
+                "basis": "22：这两题需要文章前部的赛程和酒店距离原句，你贴出的文字从停车段开始，没有对应定位句，不能凭选项反推，不硬给。",
+                "conclusion": "",
+            },
+            {
+                "focus": "第23题",
+                "basis": "①题干 want to park 定位到原文 Make sure to download your parking pass。②C 与这两处同义。③A 错在原文是进入后引导，不是打电话。",
+                "conclusion": "C",
+            },
+        ],
+    }
+    app.collapse_repeated_item_steps(parsed)
+    app.relax_partial_material_gap(parsed)
+    focuses = [step["focus"] for step in parsed["reasoning_steps"]]
+    assert focuses == ["第21题", "第22题", "第23题"]
+    assert "不硬给" in parsed["reasoning_steps"][0]["basis"]
+    assert not parsed["reasoning_steps"][0]["basis"].startswith("22")
+    assert "①" in parsed["reasoning_steps"][2]["basis"]
+    assert parsed["reasoning_steps"][2]["conclusion"] == "C. Obtain a parking pass"
+    assert parsed["need_more_context"] is False
+    passage = "阅读理解\n21. What should you do?\nA. Call\nB. Prepay\nC. Obtain\nD. Choose"
+    instruction = app.rewrite_instruction({"reasoning_steps": [], "answer": "C"}, passage)
+    assert "充当什么" not in instruction
+    assert "不要写完再回到前面的题" in instruction
+
+
 def test_history_followup_keeps_the_previous_type() -> None:
     history = [
         app.ChatMessage(
@@ -620,6 +675,7 @@ def run_unit() -> None:
     test_rejection_without_the_word_conflict_still_counts()
     test_planning_notes_do_not_replace_the_lecture()
     test_duplicate_step_for_the_same_item_is_dropped()
+    test_reading_items_are_not_explained_twice()
     print("unit ok")
 
 

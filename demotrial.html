@@ -279,8 +279,7 @@
         }
 
         .note-card > div:first-child,
-        .extend-card > div:first-child,
-        #pending-upload-preview {
+        .extend-card > div:first-child {
             position: relative;
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 8px 16px rgba(128, 142, 161, 0.12);
         }
@@ -403,18 +402,64 @@
             border-color: rgba(125, 146, 178, 0.22);
         }
 
-        .pending-upload {
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        .attach-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 6px 8px 2px 2px;
         }
-        .pending-upload:hover {
-            border-color: rgba(125, 146, 178, 0.24);
-            box-shadow: var(--shadow-lift), var(--shadow-press);
+        .attach-chip {
+            position: relative;
+            width: 68px;
+            height: 68px;
+            flex: 0 0 auto;
+        }
+        .attach-chip img {
+            width: 68px;
+            height: 68px;
+            object-fit: cover;
+            border-radius: 12px;
+            display: block;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: none;
+        }
+        .attach-chip-remove {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            border: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            color: #4b5563;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+            cursor: pointer;
+            padding: 0;
+        }
+        .attach-chip-remove:hover {
+            background: #f3f4f6;
+            color: #111827;
         }
 
         .chat-image-bubble img {
             display: block;
             max-width: 100%;
             border-radius: 16px;
+        }
+        .chat-image-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+        }
+        .chat-image-grid.is-multi img {
+            width: 8.5rem;
+            height: 8.5rem;
+            max-height: none;
+            object-fit: cover;
         }
 
         .note-card.hidden-by-search {
@@ -1968,6 +2013,7 @@
         }
         .chat-thinking-panel.is-finished.is-collapsed .chat-thinking-preview:not(:empty) {
             display: block;
+            cursor: pointer;
         }
         .chat-thinking-panel.is-collapsed .chat-thinking-body {
             display: none;
@@ -2625,7 +2671,24 @@
             border: 1px solid rgba(125, 146, 178, 0.16) !important;
             background: rgba(255,255,255,0.94) !important;
             box-shadow: 0 8px 24px rgba(118, 132, 153, 0.08) !important;
-            padding: 0.4rem 0.45rem 0.4rem 0.55rem !important;
+            padding: 0.35rem 0.45rem 0.35rem 0.45rem !important;
+        }
+        #pending-upload,
+        #pending-upload:hover,
+        body.night-mode #pending-upload,
+        body.warm-mode #pending-upload {
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            transform: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        #pending-upload::before,
+        #pending-upload::after,
+        body.night-mode #pending-upload::before,
+        body.night-mode #pending-upload::after {
+            display: none !important;
         }
         .composer-shell::before,
         .composer-shell::after {
@@ -3001,30 +3064,10 @@
             cursor: pointer;
         }
         .memo-upload-preview-wrap {
-            position: relative;
-            margin-top: 0.45rem;
             display: none;
+            margin-top: 0.55rem;
         }
-        .memo-upload-preview-wrap.is-on { display: block; }
-        .memo-upload-preview-wrap img {
-            width: 100%;
-            max-height: 8rem;
-            object-fit: cover;
-            border-radius: 12px;
-            display: block;
-        }
-        .memo-upload-clear {
-            position: absolute;
-            top: 0.4rem;
-            right: 0.4rem;
-            border: 0;
-            border-radius: 999px;
-            background: rgba(255,255,255,0.88);
-            color: #7a746c;
-            width: 1.6rem;
-            height: 1.6rem;
-            cursor: pointer;
-        }
+        .memo-upload-preview-wrap.is-on { display: inline-flex; }
         .memo-reader-edit {
             margin-left: auto;
             border: 1px solid rgba(125, 146, 178, 0.18);
@@ -3366,9 +3409,9 @@
                         <label>图片（可选）</label>
                         <input id="memo-editor-image" type="file" accept="image/jpeg,image/png,image/webp" class="hidden">
                         <button type="button" id="memo-editor-image-btn" class="memo-upload-btn"><i class="fa-regular fa-image"></i><span>添加图片</span></button>
-                        <div id="memo-editor-preview-wrap" class="memo-upload-preview-wrap">
+                        <div id="memo-editor-preview-wrap" class="memo-upload-preview-wrap attach-chip">
                             <img id="memo-editor-preview" alt="笔记图片预览">
-                            <button type="button" id="memo-editor-image-clear" class="memo-upload-clear" aria-label="移除图片"><i class="fa-solid fa-xmark text-xs"></i></button>
+                            <button type="button" id="memo-editor-image-clear" class="attach-chip-remove" aria-label="移除图片"><i class="fa-solid fa-xmark text-[9px]"></i></button>
                         </div>
                     </div>
                     <div class="memo-sheet-actions">
@@ -3426,22 +3469,16 @@
                 <div class="message-animate flex flex-col items-start"><span class="chat-meta-line ml-0.5">陶然 · 刚刚</span><div class="chat-bubble-ai chat-text leading-relaxed">你好，我是陶然。阅读、完形、语法填空都可以直接问。</div></div>
             </div>
             <div class="chat-composer-wrap p-3 lg:p-4 shrink-0">
-                <div id="pending-upload" class="pending-upload hidden mb-3 bg-white/80 border border-gray-200 rounded-[18px] p-3">
-                    <div class="flex items-start gap-3">
-                        <img id="pending-upload-preview" src="" alt="待发送图片预览" class="w-20 h-20 rounded-[14px] object-cover border border-gray-200">
-                        <div class="flex-1 min-w-0">
-                            <p id="pending-upload-name" class="text-sm font-medium text-gray-700 truncate"></p>
-                            <p id="pending-upload-meta" class="text-xs text-gray-400 mt-1"></p>
-                            <p class="text-xs text-gray-400 mt-2">支持 JPG / PNG / WebP，单张不超过 3MB</p>
-                        </div>
-                        <button id="pending-upload-remove" class="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-400 hover:text-red-500 transition"><i class="fa-solid fa-xmark"></i></button>
+                <div id="composer-shell" class="composer-shell flex flex-col">
+                    <div id="pending-upload" class="pending-upload hidden">
+                        <div id="pending-upload-list" class="attach-strip"></div>
                     </div>
-                </div>
-                <div id="composer-shell" class="composer-shell flex items-end">
-                    <button id="upload-image-btn" class="soft-icon-btn p-2.5 text-brand rounded-xl transition mb-0.5 ml-0.5"><i class="fa-solid fa-paperclip text-lg"></i></button>
-                    <input id="chat-image-input" type="file" accept="image/png,image/jpeg,image/webp" class="hidden">
-                    <textarea id="chat-input" class="flex-1 max-h-32 min-h-[40px] bg-transparent border-none focus:ring-0 resize-none text-gray-700 placeholder-gray-400 outline-none" rows="1" placeholder="输入题目或问题..." onkeydown="handleInputKey(event)"></textarea>
-                    <button id="send-btn" class="soft-send-btn m-1 w-9 h-9 rounded-full flex items-center justify-center transition shrink-0" onclick="sendMessage()"><i class="fa-solid fa-arrow-up text-sm"></i></button>
+                    <div class="flex items-end">
+                        <button id="upload-image-btn" class="soft-icon-btn p-2.5 text-brand rounded-xl transition mb-0.5 ml-0.5"><i class="fa-solid fa-paperclip text-lg"></i></button>
+                        <input id="chat-image-input" type="file" accept="image/png,image/jpeg,image/webp" multiple class="hidden">
+                        <textarea id="chat-input" class="flex-1 max-h-32 min-h-[40px] bg-transparent border-none focus:ring-0 resize-none text-gray-700 placeholder-gray-400 outline-none" rows="1" placeholder="输入题目或问题..." onkeydown="handleInputKey(event)"></textarea>
+                        <button id="send-btn" class="soft-send-btn m-1 w-9 h-9 rounded-full flex items-center justify-center transition shrink-0" onclick="sendMessage()"><i class="fa-solid fa-arrow-up text-sm"></i></button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -3684,10 +3721,7 @@
             const composerShell = document.getElementById('composer-shell');
             const chatMeta = document.getElementById('chat-meta');
             const pendingUpload = document.getElementById('pending-upload');
-            const pendingUploadPreview = document.getElementById('pending-upload-preview');
-            const pendingUploadName = document.getElementById('pending-upload-name');
-            const pendingUploadMeta = document.getElementById('pending-upload-meta');
-            const pendingUploadRemove = document.getElementById('pending-upload-remove');
+            const pendingUploadList = document.getElementById('pending-upload-list');
             const historyBtn = document.getElementById('history-btn');
             const historyPanel = document.getElementById('history-panel');
             const historyOverlay = document.getElementById('history-overlay');
@@ -3821,6 +3855,7 @@
             const CHAT_API_URL = getChatApiUrl();
             const IMAGE_ACCEPT_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
             const IMAGE_MAX_SIZE = 3 * 1024 * 1024;
+            const MAX_CHAT_IMAGES = 6;
             const DB_NAME = 'taoran-chat-demo-db';
             const DB_VERSION = 2;
             const STORE_NAME = 'chat_sessions';
@@ -3894,7 +3929,7 @@
             let db = null;
             let currentChatId = null;
             let isSending = false;
-            let pendingImage = null;
+            let pendingImages = [];
             let pendingAiIndicator = null;
             let currentViewportMode = window.innerWidth < 1280 ? 'mobile' : 'desktop';
             let profileDraftAvatar = '';
@@ -4361,8 +4396,10 @@
             }
 
             function snapshotToThinkingText(snapshot) {
-                const stream = sanitizeThinkingTranscript(snapshot && snapshot.streamText);
-                if (stream) return stream;
+                const raw = String(snapshot && snapshot.streamText || '');
+                const stream = sanitizeThinkingTranscript(raw);
+                if (stream && (!raw || stream.length >= raw.length * 0.6)) return stream;
+                if (raw.trim()) return raw.trim();
                 const steps = Array.isArray(snapshot && snapshot.steps) ? snapshot.steps : [];
                 if (!steps.length) return '';
                 return sanitizeThinkingTranscript(steps.map(step => {
@@ -4511,6 +4548,10 @@
                     .concat(Array.isArray(data.knowledgeMethodology) ? data.knowledgeMethodology : [])
                     .join('\n');
                 data.questionType = correctQuestionType(data.questionType, extra);
+                if (Array.isArray(data.reasoningSteps)) {
+                    data.reasoningSteps = collapseRepeatedItemSteps(data.reasoningSteps);
+                }
+                if (data.needMoreContext && hasSettledAnswer(data)) data.needMoreContext = false;
                 return data;
             }
 
@@ -4612,6 +4653,74 @@
                     `;
                 }).join('');
                 return `<div class="chat-structured-steps">${cards}</div>`;
+            }
+
+            function explainQuality(step) {
+                const blob = `${step && step.basis || ''} ${step && step.conclusion || ''}`;
+                let score = (blob.match(/[\u4e00-\u9fff]/g) || []).length;
+                if (/[①②③④⑤]/.test(blob)) score += 500;
+                if (/错在|定位到|同义|不硬给|不能凭选项/.test(blob)) score += 180;
+                if (/[A-Za-z]{4,}/.test(blob) && !/未出现/.test(blob)) score += 160;
+                if (/原词未出现|无法判断/.test(blob) && !/[A-Za-z]{4,}/.test(blob)) score -= 100;
+                return score;
+            }
+
+            function preferConclusion(previous, incoming) {
+                const oldText = String(previous || '').trim();
+                const newText = String(incoming || '').trim();
+                if (!newText) return oldText;
+                if (!oldText || (/需要确认/.test(oldText) && !/需要确认/.test(newText))) return newText;
+                if (oldText.length >= newText.length) return oldText;
+                return newText;
+            }
+
+            function stripForeignLead(basis, nums) {
+                const lead = String(basis || '').match(/^\s*(\d{1,2})\s*[：:]\s*/);
+                if (lead && !nums.includes(Number(lead[1]))) return String(basis).slice(lead[0].length);
+                return basis || '';
+            }
+
+            function hasSettledAnswer(data) {
+                const answer = String(data && data.answer || '').trim();
+                if (!answer || answer === '需要确认') return false;
+                return answer.split(/\n|；|;/).some(part => {
+                    const text = part.trim();
+                    return text && !/需要确认/.test(text) && /[A-D]\b|[A-Za-z]{2,}/.test(text);
+                });
+            }
+
+            function collapseRepeatedItemSteps(steps) {
+                const kept = [];
+                const indexByNum = new Map();
+                (Array.isArray(steps) ? steps : []).forEach(step => {
+                    if (!step) return;
+                    const nums = [...stepBlankNums(step)];
+                    if (nums.length && nums.every(num => indexByNum.has(num))) {
+                        nums.forEach(num => {
+                            const prev = kept[indexByNum.get(num)];
+                            if (explainQuality(step) > explainQuality(prev)) {
+                                prev.basis = stripForeignLead(step.basis, [num]);
+                                prev.conclusion = preferConclusion(prev.conclusion, step.conclusion);
+                            }
+                        });
+                        return;
+                    }
+                    const primary = nums.length ? Math.min(...nums) : 0;
+                    if (primary && indexByNum.has(primary)) {
+                        const prev = kept[indexByNum.get(primary)];
+                        if (explainQuality(step) > explainQuality(prev)) {
+                            prev.basis = stripForeignLead(step.basis, [primary]);
+                            prev.conclusion = preferConclusion(prev.conclusion, step.conclusion);
+                        }
+                        return;
+                    }
+                    kept.push({ ...step });
+                    nums.forEach(num => {
+                        if (!indexByNum.has(num)) indexByNum.set(num, kept.length - 1);
+                    });
+                });
+                const collapsed = kept.map((step, index) => ({ ...step, step: index + 1 }));
+                return collapsed;
             }
 
             function stepBlankNums(step) {
@@ -4717,7 +4826,8 @@
                     merged.push({ ...block, step: merged.length + 1 });
                     nums.forEach(num => used.add(num));
                 });
-                data.reasoningSteps = merged.map((step, index) => ({ ...step, step: index + 1 }));
+                data.reasoningSteps = collapseRepeatedItemSteps(merged.map((step, index) => ({ ...step, step: index + 1 })));
+                if (data.needMoreContext && hasSettledAnswer(data)) data.needMoreContext = false;
                 return data;
             }
 
@@ -4783,9 +4893,22 @@
                 return /如果|若|当|则|复现|概括|态度|起承转合|核心|定位|同义|主旨|套路|主动|被动|谓语|非谓语|冠词|从句|转折|因果|正负|动作链|一致|匹配|需|发音|时态|比较|单数|复数|介词|动名词|不定式|常识|原文没有|关系副词|完成时|进行时|标志|where|which|when|指代|建议|益处|原因|逻辑|衔接|代词|：|:|→|->/i.test(raw);
             }
 
+            function isMaterialRequestLine(text) {
+                return /只有问候|没有原文|没有题目|先收题目|先补材料|先选定|发来即可|截图发|把要讲的题|当前信息还不够|需要补充|还没有题目/.test(String(text || ''));
+            }
+
+            function canOfferTeachingPoints(data) {
+                if (!data || data.supported === false) return false;
+                if (isIncompleteTeachingCard(data)) return false;
+                if (/寒暄|多题待选择|代写/.test(String(data.subtype || ''))) return false;
+                const answer = String(data.answer || '').trim();
+                return Boolean(answer) && answer !== '需要确认';
+            }
+
             function isSaveableTeachingLine(text) {
                 const raw = String(text || '').trim();
                 if (!raw || raw.length < 8 || raw.length > 280) return false;
+                if (isMaterialRequestLine(raw)) return false;
                 if (/^(?:答案|answer)\s*[:：]/.test(raw)) return false;
                 if (/^(?:第\s*)?\d+\s*[.．、]\s*[A-D]\b/.test(raw)) return false;
                 if (/(与语句理解|理解能力相关|与理解有关|需要结合语境|结合上下文判断|具体问题具体分析)/.test(raw)) return false;
@@ -4795,7 +4918,7 @@
                 if (cjk < 6) return false;
                 if (words.length >= 14 && cjk < 12) return false;
                 if (looksLikeMethodRule(raw)) return true;
-                return /所以|因此|用|填|选|排除|冲突|改成|改为|不能|不要|应该/.test(raw);
+                return /所以|因此|用|填|不选|应选|所以选|排除|冲突|改成|改为|不能|不要|应该/.test(raw);
             }
 
             function isUsefulKnowledgeLine(text) {
@@ -4865,7 +4988,7 @@
             }
 
             function getKnowledgeMethodologyLines(data) {
-                if (!data) return [];
+                if (!canOfferTeachingPoints(data)) return [];
                 const primary = mergeKnowledgeLines(data.knowledgeMethodology).filter(isUsefulKnowledgeLine);
                 const teaching = mergeKnowledgeLines(data.teachingPoints || extractTeachingPointLines(data.followUp));
                 const followRule = looksLikeMethodRule(data.followUp) ? [String(data.followUp).trim()] : [];
@@ -5959,50 +6082,85 @@
                 return `${(size / (1024 * 1024)).toFixed(1)} MB`;
             }
 
-            function clearPendingImage() {
-                pendingImage = null;
+            function clearPendingImages() {
+                pendingImages = [];
                 pendingUpload.classList.add('hidden');
-                pendingUploadPreview.src = '';
-                pendingUploadName.textContent = '';
-                pendingUploadMeta.textContent = '';
+                if (pendingUploadList) pendingUploadList.innerHTML = '';
                 chatImageInput.value = '';
             }
 
-            function renderPendingImage() {
-                if (!pendingImage) {
-                    clearPendingImage();
+            function renderPendingImages() {
+                const ready = pendingImages.filter(item => item && item.dataUrl);
+                if (!pendingImages.length) {
+                    clearPendingImages();
                     return;
                 }
-                pendingUploadPreview.src = pendingImage.dataUrl;
-                pendingUploadName.textContent = pendingImage.name;
-                pendingUploadMeta.textContent = `${pendingImage.mimeType.replace('image/', '').toUpperCase()} · ${formatFileSize(pendingImage.size)}`;
-                pendingUpload.classList.remove('hidden');
+                if (pendingUploadList) {
+                    pendingUploadList.innerHTML = ready.map(item => `
+                        <div class="attach-chip">
+                            <img src="${item.dataUrl}" alt="${escapeHtml(item.name || '待发送图片')}">
+                            <button type="button" class="attach-chip-remove" data-remove-pending="${item.id}" aria-label="移除这张图片"><i class="fa-solid fa-xmark text-[9px]"></i></button>
+                        </div>
+                    `).join('');
+                }
+                pendingUpload.classList.toggle('hidden', ready.length === 0);
             }
 
-            function processChatImageFile(file) {
-                if (!file) return;
-                if (!IMAGE_ACCEPT_TYPES.includes(file.type)) {
-                    showToast('仅支持 JPG、PNG、WebP 图片');
-                    clearPendingImage();
-                    return;
-                }
-                if (file.size > IMAGE_MAX_SIZE) {
-                    showToast('图片不能超过 3MB');
-                    clearPendingImage();
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    pendingImage = {
+            function removePendingImage(id) {
+                pendingImages = pendingImages.filter(item => item.id !== id);
+                renderPendingImages();
+            }
+
+            function processChatImageFiles(fileList) {
+                const incoming = Array.from(fileList || []).filter(Boolean);
+                if (!incoming.length) return;
+                const room = Math.max(0, MAX_CHAT_IMAGES - pendingImages.length);
+                const accepted = [];
+                let typeRejected = false;
+                let sizeRejected = false;
+                let overflow = false;
+                incoming.forEach(file => {
+                    if (accepted.length >= room) {
+                        overflow = true;
+                        return;
+                    }
+                    if (!IMAGE_ACCEPT_TYPES.includes(file.type)) {
+                        typeRejected = true;
+                        return;
+                    }
+                    if (file.size > IMAGE_MAX_SIZE) {
+                        sizeRejected = true;
+                        return;
+                    }
+                    accepted.push(file);
+                });
+                if (typeRejected) showToast('仅支持 JPG、PNG、WebP 图片');
+                if (sizeRejected) showToast('图片不能超过 3MB');
+                if (overflow) showToast(`一次最多添加 ${MAX_CHAT_IMAGES} 张图片`);
+                accepted.forEach(file => {
+                    const id = crypto.randomUUID();
+                    pendingImages.push({
+                        id,
                         name: file.name || `image-${Date.now()}.png`,
                         size: file.size,
                         mimeType: file.type,
-                        dataUrl: String(event.target.result || '')
+                        dataUrl: ''
+                    });
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const item = pendingImages.find(image => image.id === id);
+                        if (!item) return;
+                        item.dataUrl = String(event.target.result || '');
+                        renderPendingImages();
                     };
-                    renderPendingImage();
-                    showToast('已添加图片，发送即可提问');
-                };
-                reader.readAsDataURL(file);
+                    reader.onerror = function() {
+                        pendingImages = pendingImages.filter(image => image.id !== id);
+                        renderPendingImages();
+                    };
+                    reader.readAsDataURL(file);
+                });
+                if (accepted.length === 1) showToast('已添加图片，发送即可提问');
+                if (accepted.length > 1) showToast(`已添加 ${accepted.length} 张图片，发送即可提问`);
             }
 
             function isImageTransfer(dataTransfer) {
@@ -6023,23 +6181,25 @@
                 setComposerDragActive(false);
             }
 
-            function getClipboardImageFile(event) {
+            function getClipboardImageFiles(event) {
                 const items = Array.from(event.clipboardData?.items || []);
-                const imageItem = items.find(item => item.kind === 'file' && item.type && item.type.startsWith('image/'));
-                if (!imageItem) return null;
-                const file = imageItem.getAsFile();
-                if (!file) return null;
-                if (!file.name) {
-                    const ext = (file.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
-                    return new File([file], `pasted-image-${Date.now()}.${ext}`, { type: file.type });
-                }
-                return file;
+                return items
+                    .filter(item => item.kind === 'file' && item.type && item.type.startsWith('image/'))
+                    .map(item => item.getAsFile())
+                    .filter(Boolean)
+                    .map(file => {
+                        if (file.name) return file;
+                        const ext = (file.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+                        return new File([file], `pasted-image-${Date.now()}.${ext}`, { type: file.type });
+                    });
             }
 
             function getMessagePreview(message) {
                 if (!message) return '暂无消息';
                 if (message.type === 'image') {
-                    return message.content ? `[图片] ${message.content}` : '[图片]';
+                    const count = Array.isArray(message.images) && message.images.length > 1 ? message.images.length : 1;
+                    const label = count > 1 ? `[图片x${count}]` : '[图片]';
+                    return message.content ? `${label} ${message.content}` : label;
                 }
                 if (message.sender === 'ai') {
                     const structured = parseStructuredReply(message.content || '');
@@ -6797,7 +6957,17 @@
 
                 function visibleThinkingText() {
                     if (hasNativeThinking) {
-                        return sanitizeThinkingTranscript(rawThinking, !finished);
+                        if (!finished) {
+                            const native = sanitizeThinkingTranscript(rawThinking, true);
+                            // The full-buffer filter sometimes keeps only a short prefix while
+                            // the model is still writing. Show the raw transcript so the chain
+                            // keeps growing instead of freezing.
+                            if (native && native.length >= rawThinking.length * 0.6) return native;
+                            return rawThinking;
+                        }
+                        const settled = sanitizeThinkingTranscript(rawThinking, false);
+                        if (settled && settled.length >= rawThinking.length * 0.6) return settled;
+                        return rawThinking;
                     }
                     if (fallbackProse) return fallbackProse;
                     return streamText;
@@ -6846,8 +7016,6 @@
                         }
                         if (event.type === 'thinking' && event.text) {
                             rawThinking += event.text;
-                            const native = sanitizeThinkingTranscript(rawThinking, true);
-                            if (!native) return;
                             hasNativeThinking = true;
                             localPlaceholder = false;
                             statusText = '正在想这道题';
@@ -6856,14 +7024,11 @@
                             renderStream();
                         }
                         if (event.type === 'done' && event.thinking) {
-                            rawThinking = String(event.thinking);
-                            const native = sanitizeThinkingTranscript(rawThinking, false);
-                            if (native) {
-                                hasNativeThinking = true;
-                                localPlaceholder = false;
-                                setExpanded(true);
-                                renderStream();
-                            }
+                            const settled = String(event.thinking);
+                            if (!rawThinking || settled.length > rawThinking.length) rawThinking = settled;
+                            hasNativeThinking = true;
+                            localPlaceholder = false;
+                            renderStream();
                         }
                     },
                     startLocalStages,
@@ -6888,10 +7053,9 @@
                             clearInterval(durationTimer);
                             durationTimer = null;
                         }
-                        if (hasNativeThinking) {
-                            rawThinking = sanitizeThinkingTranscript(rawThinking, false);
-                        } else {
-                            streamText = sanitizeThinkingTranscript(streamText, false);
+                        if (!hasNativeThinking) {
+                            const settled = sanitizeThinkingTranscript(streamText, false);
+                            if (settled && settled.length >= streamText.length * 0.6) streamText = settled;
                         }
                         updateHeader();
                         renderStream();
@@ -7036,16 +7200,33 @@
                 }
 
                 const toggle = event.target.closest('.chat-thinking-toggle');
-                if (!toggle || !chatWindow.contains(toggle)) return;
-                const panel = toggle.closest('.chat-thinking-panel');
+                const previewHit = event.target.closest('.chat-thinking-preview');
+                if ((!toggle && !previewHit) || !chatWindow.contains(toggle || previewHit)) return;
+                const panel = (toggle || previewHit).closest('.chat-thinking-panel');
                 if (!panel) return;
                 event.preventDefault();
                 const collapsed = panel.classList.toggle('is-collapsed');
-                toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                const toggleBtn = panel.querySelector('.chat-thinking-toggle');
+                if (toggleBtn) toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
                 if (!collapsed) {
                     scrollChatToElement(panel);
                 }
             });
+
+            function galleryFromOptions(options) {
+                if (Array.isArray(options.images) && options.images.length) {
+                    return options.images.filter(image => image && image.dataUrl);
+                }
+                if (options.imageDataUrl) {
+                    return [{
+                        dataUrl: options.imageDataUrl,
+                        mimeType: options.mimeType || '',
+                        fileName: options.fileName || '',
+                        fileSize: options.fileSize || 0
+                    }];
+                }
+                return [];
+            }
 
             function appendMessage(content, sender, options = {}) {
                 const createdAt = options.createdAt || new Date().toISOString();
@@ -7054,16 +7235,18 @@
                 const div = document.createElement('div');
                 const time = new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 div.className = `message-animate flex flex-col ${sender === 'user' ? 'items-end' : 'items-start'}`;
-                if (type === 'image') {
+                const gallery = galleryFromOptions(options);
+                if (type === 'image' && gallery.length) {
                     const safeCaption = content ? `<p class="mt-3 text-[14px] leading-relaxed chat-text">${escapeHtml(content).replace(/\n/g, '<br>')}</p>` : '';
-                    const imageSrc = options.imageDataUrl || '';
+                    const gridClass = gallery.length > 1 ? 'chat-image-grid is-multi' : 'chat-image-grid';
+                    const imageHtml = gallery.map(image => `<img src="${image.dataUrl}" alt="聊天上传图片" class="${gallery.length > 1 ? '' : 'max-h-72 object-cover'}">`).join('');
                     const bubbleClass = sender === 'user'
                         ? 'chat-bubble-user rounded-2xl'
                         : 'chat-bubble-ai';
                     div.innerHTML = `
                         <span class="chat-meta-line ${sender === 'user' ? 'mr-0.5' : 'ml-0.5'}">${sender === 'user' ? '我' : '陶然'} · ${time}</span>
                         <div class="chat-image-bubble ${bubbleClass} max-w-[85%] p-2">
-                            <img src="${imageSrc}" alt="聊天上传图片" class="max-h-72 object-cover">
+                            <div class="${gridClass}">${imageHtml}</div>
                             ${safeCaption}
                         </div>
                     `;
@@ -7103,12 +7286,13 @@
                 return {
                     id: crypto.randomUUID(),
                     sender,
-                    type,
+                    type: gallery.length ? 'image' : type,
                     content,
-                    imageDataUrl: options.imageDataUrl || '',
-                    mimeType: options.mimeType || '',
-                    fileName: options.fileName || '',
-                    fileSize: options.fileSize || 0,
+                    imageDataUrl: gallery[0] ? gallery[0].dataUrl : '',
+                    mimeType: gallery[0] ? (gallery[0].mimeType || '') : '',
+                    fileName: gallery[0] ? (gallery[0].fileName || '') : '',
+                    fileSize: gallery[0] ? (gallery[0].fileSize || 0) : 0,
+                    images: gallery,
                     thinkingSnapshot: options.thinkingSnapshot || null,
                     createdAt
                 };
@@ -7126,6 +7310,7 @@
                         mimeType: message.mimeType || '',
                         fileName: message.fileName || '',
                         fileSize: message.fileSize || 0,
+                        images: Array.isArray(message.images) ? message.images : [],
                         thinkingSnapshot: message.thinkingSnapshot || null
                     });
                 });
@@ -8663,7 +8848,7 @@
                     .map(message => ({
                         sender: message.sender,
                         content: message.type === 'image'
-                            ? (message.content ? `[图片] ${message.content}` : '[图片]')
+                            ? `${(Array.isArray(message.images) && message.images.length > 1) ? `[图片x${message.images.length}]` : '[图片]'}${message.content ? ` ${message.content}` : ''}`
                             : message.content
                     }))
                     .filter(item => String(item.content || '').trim());
@@ -8692,44 +8877,72 @@
                 return /(?:第\s*\d{1,3}\s*[空题小题]|上[一]?[空题]|下[一]?[空题]|这[一]?[空题]).{0,40}?(?:为什么|为何|再讲|怎么|如何|可以|不行|不能|不选|不是|不对)|(?:为什么|为何|再讲一下|怎么选|怎么填).{0,24}?(?:第\s*\d{1,3}\s*[空题小题]|这[一]?空)/.test(source);
             }
 
-            async function getLastChatImagePayload() {
-                if (!db || !currentChatId) return null;
-                const chat = await getChatById(currentChatId);
-                if (!chat) return null;
-                for (let index = chat.messages.length - 1; index >= 0; index -= 1) {
-                    const message = chat.messages[index];
-                    if (message && message.sender === 'user' && message.type === 'image' && message.imageDataUrl) {
-                        return {
-                            name: message.fileName || 'question.png',
-                            mimeType: message.mimeType || 'image/png',
-                            dataUrl: message.imageDataUrl,
-                            size: message.fileSize || 0
-                        };
-                    }
+            function imagePayloadsFromMessage(message) {
+                if (!message || message.sender !== 'user' || message.type !== 'image') return [];
+                if (Array.isArray(message.images) && message.images.length) {
+                    return message.images.filter(image => image && image.dataUrl).map(image => ({
+                        name: image.fileName || 'question.png',
+                        mimeType: image.mimeType || 'image/png',
+                        dataUrl: image.dataUrl,
+                        size: image.fileSize || 0
+                    }));
                 }
-                return null;
+                if (message.imageDataUrl) {
+                    return [{
+                        name: message.fileName || 'question.png',
+                        mimeType: message.mimeType || 'image/png',
+                        dataUrl: message.imageDataUrl,
+                        size: message.fileSize || 0
+                    }];
+                }
+                return [];
+            }
+
+            async function getLastChatImagePayload() {
+                if (!db || !currentChatId) return [];
+                const chat = await getChatById(currentChatId);
+                if (!chat) return [];
+                for (let index = chat.messages.length - 1; index >= 0; index -= 1) {
+                    const images = imagePayloadsFromMessage(chat.messages[index]);
+                    if (images.length) return images;
+                }
+                return [];
             }
 
             function getChatStreamApiUrl() {
                 return CHAT_API_URL.replace(/\/api\/chat\/?$/, '/api/chat/stream');
             }
 
+            function asImagePayloadList(imagePayload) {
+                const list = Array.isArray(imagePayload) ? imagePayload : (imagePayload ? [imagePayload] : []);
+                return list.filter(item => item && item.dataUrl).map(item => ({
+                    name: item.fileName || item.name || 'question.png',
+                    mimeType: item.mimeType || 'image/png',
+                    dataUrl: item.dataUrl,
+                    size: item.size || item.fileSize || 0
+                }));
+            }
+
             function buildChatRequestBody(messageText, imagePayload, history, options = {}) {
                 const keepMessage = options.keepMessage || isBlankFollowup(messageText);
-                const imageName = imagePayload && (imagePayload.fileName || imagePayload.name || 'question.png');
-                const fallbackText = imagePayload && !keepMessage
-                    ? `我上传了一张图片：${imageName}${messageText ? `。补充说明：${messageText}` : '。请先帮我确认收到并给出分析建议。'}`
-                    : (messageText || (imagePayload ? '请结合图片继续讲这道题。' : ''));
+                const images = asImagePayloadList(imagePayload);
+                const imageName = images.map(item => item.name).join('、');
+                const countLabel = images.length > 1 ? `${images.length}张图片` : '一张图片';
+                const fallbackText = images.length && !keepMessage
+                    ? `我上传了${countLabel}：${imageName}${messageText ? `。补充说明：${messageText}` : '。请先帮我确认收到并给出分析建议。'}`
+                    : (messageText || (images.length ? '请结合图片继续讲这道题。' : ''));
+                const payloadImages = images.map(item => ({
+                    file_name: item.name,
+                    mime_type: item.mimeType,
+                    data_url: item.dataUrl
+                }));
                 return {
                     session_id: currentChatId,
                     message: fallbackText,
                     history,
                     use_ocr_first: options.useOcrFirst !== false,
-                    latest_image: imagePayload ? {
-                        file_name: imageName,
-                        mime_type: imagePayload.mimeType,
-                        data_url: imagePayload.dataUrl
-                    } : null
+                    latest_image: payloadImages[0] || null,
+                    images: payloadImages
                 };
             }
 
@@ -8817,8 +9030,8 @@
             async function requestAssistantReply(messageText, imagePayload = null, onEvent = null) {
                 const history = await getCurrentChatHistoryForApi();
                 let attachedImage = imagePayload;
-                let useOcrFirst = Boolean(imagePayload);
-                if (!attachedImage && isBlankFollowup(messageText)) {
+                let useOcrFirst = asImagePayloadList(imagePayload).length > 0;
+                if (!asImagePayloadList(attachedImage).length && isBlankFollowup(messageText)) {
                     attachedImage = await getLastChatImagePayload();
                     useOcrFirst = false;
                 }
@@ -8953,16 +9166,23 @@
 
             window.sendMessage = async function() {
                 const text = chatInput.value.trim();
-                if ((!text && !pendingImage) || isSending) return;
+                const readyImages = pendingImages.filter(item => item && item.dataUrl);
+                if ((!text && !readyImages.length) || isSending) return;
                 pinChatToBottom();
                 let userMessage;
-                if (pendingImage) {
+                if (readyImages.length) {
                     userMessage = appendMessage(text, 'user', {
                         type: 'image',
-                        imageDataUrl: pendingImage.dataUrl,
-                        mimeType: pendingImage.mimeType,
-                        fileName: pendingImage.name,
-                        fileSize: pendingImage.size
+                        imageDataUrl: readyImages[0].dataUrl,
+                        mimeType: readyImages[0].mimeType,
+                        fileName: readyImages[0].name,
+                        fileSize: readyImages[0].size,
+                        images: readyImages.map(item => ({
+                            dataUrl: item.dataUrl,
+                            mimeType: item.mimeType,
+                            fileName: item.name,
+                            fileSize: item.size
+                        }))
                     });
                 } else {
                     userMessage = appendMessage(text, 'user');
@@ -8975,8 +9195,8 @@
                     showToast('用户消息保存失败');
                 }
                 setSendingState(true);
-                const shouldSaveToFlashcard = !pendingImage && isFlashcardSaveRequest(text);
-                const shouldSaveToNote = !pendingImage && isNoteSaveRequest(text);
+                const shouldSaveToFlashcard = !readyImages.length && isFlashcardSaveRequest(text);
+                const shouldSaveToNote = !readyImages.length && isNoteSaveRequest(text);
                 if (shouldSaveToFlashcard || shouldSaveToNote) {
                     try {
                         const chat = currentChatId ? await getChatById(currentChatId) : null;
@@ -9032,13 +9252,18 @@
                 }
                 const thinkingIndicator = appendThinkingIndicator({
                     messageText: text,
-                    hasImage: Boolean(pendingImage)
+                    hasImage: readyImages.length > 0
                 });
                 const thinkingStartedAt = Date.now();
                 try {
-                    const currentImage = pendingImage;
-                    clearPendingImage();
-                    const assistant = await requestAssistantReply(text, currentImage, (event) => {
+                    const currentImages = readyImages.map(item => ({
+                        name: item.name,
+                        mimeType: item.mimeType,
+                        dataUrl: item.dataUrl,
+                        size: item.size
+                    }));
+                    clearPendingImages();
+                    const assistant = await requestAssistantReply(text, currentImages, (event) => {
                         if (thinkingIndicator._thinkingController) {
                             thinkingIndicator._thinkingController.handleEvent(event);
                         }
@@ -9079,7 +9304,7 @@
                         showToast('AI 回复保存失败');
                     }
                 } catch (error) {
-                    clearPendingImage();
+                    clearPendingImages();
                     if (thinkingIndicator._thinkingController) {
                         thinkingIndicator._thinkingController.destroy();
                     }
@@ -9430,11 +9655,17 @@
             persistSavedNotes();
             setActiveMemoTag('all');
             uploadImageBtn.addEventListener('click', () => chatImageInput.click());
-            pendingUploadRemove.addEventListener('click', clearPendingImage);
+            if (pendingUploadList) {
+                pendingUploadList.addEventListener('click', event => {
+                    const btn = event.target.closest('[data-remove-pending]');
+                    if (!btn) return;
+                    removePendingImage(btn.dataset.removePending);
+                });
+            }
             chatImageInput.addEventListener('change', () => {
-                const [file] = chatImageInput.files || [];
-                if (!file) return;
-                processChatImageFile(file);
+                const files = Array.from(chatImageInput.files || []);
+                if (!files.length) return;
+                processChatImageFiles(files);
                 chatImageInput.value = '';
             });
             chatStage.addEventListener('dragenter', event => {
@@ -9461,20 +9692,20 @@
                 if (!isImageTransfer(event.dataTransfer)) return;
                 event.preventDefault();
                 resetComposerDragState();
-                const file = Array.from(event.dataTransfer.files || []).find(item => item.type && item.type.startsWith('image/'));
-                if (!file) {
+                const droppedImages = Array.from(event.dataTransfer.files || []).filter(item => item.type && item.type.startsWith('image/'));
+                if (!droppedImages.length) {
                     showToast('没有识别到可上传的图片');
                     return;
                 }
-                processChatImageFile(file);
+                processChatImageFiles(droppedImages);
                 chatInput.focus();
             });
             window.addEventListener('dragend', resetComposerDragState);
             chatStage.addEventListener('paste', event => {
-                const imageFile = getClipboardImageFile(event);
-                if (!imageFile) return;
+                const imageFiles = getClipboardImageFiles(event);
+                if (!imageFiles.length) return;
                 event.preventDefault();
-                processChatImageFile(imageFile);
+                processChatImageFiles(imageFiles);
             });
             profileBtn.addEventListener('click', openProfileSheet);
             profileOverlay.addEventListener('click', closeProfileSheet);
